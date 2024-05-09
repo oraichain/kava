@@ -53,6 +53,7 @@ func (k *KvtoolRunner) StartChains() Chains {
 	// start local test network with kvtool
 	log.Println("starting kava node")
 	kvtoolArgs := []string{"testnet", "bootstrap", "--kava.configTemplate", k.config.KavaConfigTemplate}
+	fmt.Printf("--kava.configTemplate: %v\n", k.config.KavaConfigTemplate)
 	// include an ibc chain if desired
 	if k.config.IncludeIBC {
 		kvtoolArgs = append(kvtoolArgs, "--ibc")
