@@ -3,13 +3,13 @@ package e2e_test
 import (
 	"context"
 	"fmt"
-	"github.com/kava-labs/kava/precompile/contracts/noop"
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 
 	"github.com/kava-labs/kava/contracts/contracts/noop_caller"
+	"github.com/kava-labs/kava/precompile/contracts/noop"
 )
 
 func (suite *IntegrationTestSuite) TestNoopPrecompile_EOAToContractToPrecompile_Success() {
@@ -30,7 +30,6 @@ func (suite *IntegrationTestSuite) TestNoopPrecompile_EOAToContractToPrecompile_
 		return len(code) != 0
 	}, 20*time.Second, 1*time.Second)
 
-	// ctx context.Context, account common.Address, blockNumber *big.Int
 	code, err := ethClient.CodeAt(context.Background(), noop.ContractAddress, nil)
 	suite.Require().NoError(err)
 	fmt.Printf("Code: %v\n", code)

@@ -3,7 +3,6 @@ package app
 import (
 	"encoding/json"
 	"fmt"
-	evmtypes "github.com/evmos/ethermint/x/evm/types"
 	"math/rand"
 	"reflect"
 	"testing"
@@ -39,6 +38,7 @@ import (
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	evmkeeper "github.com/evmos/ethermint/x/evm/keeper"
+	evmtypes "github.com/evmos/ethermint/x/evm/types"
 	feemarketkeeper "github.com/evmos/ethermint/x/feemarket/keeper"
 	"github.com/stretchr/testify/require"
 
