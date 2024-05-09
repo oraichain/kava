@@ -44,7 +44,7 @@ func FullyBackedInvariant(bankK types.BankKeeper, k Keeper) sdk.Invariant {
 		})
 
 		bankAddr := authtypes.NewModuleAddress(types.ModuleName)
-		bankBalance := bankK.GetBalance(ctx, bankAddr, CosmosDenom).Amount.Mul(ConversionMultiplier)
+		bankBalance := bankK.GetBalance(ctx, bankAddr, DefaultCosmosDenom).Amount.Mul(ConversionMultiplier)
 
 		broken = totalMinorBalances.GT(bankBalance)
 

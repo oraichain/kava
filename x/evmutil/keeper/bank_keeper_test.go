@@ -639,7 +639,7 @@ func (suite *evmBankKeeperTestSuite) TestValidateEvmCoins() {
 	}
 	for _, tt := range tests {
 		suite.Run(tt.name, func() {
-			err := keeper.ValidateEvmCoins(tt.coins)
+			err := keeper.ValidateEvmCoins(tt.coins, keeper.DefaultEvmDenom)
 			if tt.shouldErr {
 				suite.Require().Error(err)
 			} else {
@@ -780,7 +780,7 @@ func (suite *evmBankKeeperTestSuite) TestSplitAkavaCoins() {
 	}
 	for _, tt := range tests {
 		suite.Run(tt.name, func() {
-			ukava, akava, err := keeper.SplitAkavaCoins(tt.coins)
+			ukava, akava, err := keeper.SplitAkavaCoins(tt.coins, keeper.DefaultEvmDenom, keeper.DefaultCosmosDenom)
 			if tt.shouldErr {
 				suite.Require().Error(err)
 			} else {

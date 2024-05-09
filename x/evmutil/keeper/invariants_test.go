@@ -127,7 +127,7 @@ func (suite *invariantTestSuite) TestSmallBalances() {
 	// increase minor balance at least above conversion multiplier
 	suite.Keeper.AddBalance(suite.Ctx, suite.Addrs[0], keeper.ConversionMultiplier)
 	// add same number of ukava to avoid breaking other invariants
-	amt := sdk.NewCoins(sdk.NewInt64Coin(keeper.CosmosDenom, 1))
+	amt := sdk.NewCoins(sdk.NewInt64Coin(keeper.DefaultCosmosDenom, 1))
 	suite.Require().NoError(
 		suite.App.FundModuleAccount(suite.Ctx, types.ModuleName, amt),
 	)
