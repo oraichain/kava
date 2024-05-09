@@ -47,6 +47,8 @@ func NewEvmBankKeeper(akavaKeeper Keeper, bk types.BankKeeper, ak types.AccountK
 
 // GetBalance returns the total **spendable** balance of akava for a given account by address.
 func (k EvmBankKeeper) GetBalance(ctx sdk.Context, addr sdk.AccAddress, denom string) sdk.Coin {
+	fmt.Printf("denom: %v\n", denom)
+
 	if denom != EvmDenom {
 		panic(fmt.Errorf("only evm denom %s is supported by EvmBankKeeper", EvmDenom))
 	}

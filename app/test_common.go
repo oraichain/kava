@@ -3,6 +3,7 @@ package app
 import (
 	"encoding/json"
 	"fmt"
+	evmtypes "github.com/evmos/ethermint/x/evm/types"
 	"math/rand"
 	"reflect"
 	"testing"
@@ -312,6 +313,11 @@ func (tApp TestApp) InitializeFromGenesisStatesWithTimeAndChainIDAndHeight(
 	// Create a default genesis state and overwrite with provided values
 	genesisState := NewDefaultGenesisState()
 	modifiedStates := make(map[string]bool)
+
+	evmGenesisState := evmtypes.DefaultGenesisState()
+	// Ethermint's EVM Module has default denom "aphoton" - replace it with akava
+	evmGenesisState.Params.EvmDenom = "akava"
+	genesisState[evmtypes.ModuleName] = tApp.appCodec.MustMarshalJSON(evmGenesisState)
 
 	for _, state := range genesisStates {
 		for k, v := range state {
