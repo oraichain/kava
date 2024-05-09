@@ -12,10 +12,10 @@ import (
 
 const (
 	// EvmDenom is the gas denom used by the evm
-	EvmDenom = "akava"
+	EvmDenom = "aorai"
 
 	// CosmosDenom is the gas denom used by the kava app
-	CosmosDenom = "ukava"
+	CosmosDenom = "orai"
 )
 
 // ConversionMultiplier is the conversion multiplier between akava and ukava
