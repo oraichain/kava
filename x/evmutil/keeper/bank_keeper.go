@@ -226,6 +226,14 @@ func (k EvmBankKeeper) GetModuleAddress(moduleName string) sdk.AccAddress {
 	return addr
 }
 
+func (k EvmBankKeeper) SendCoins(ctx sdk.Context, fromAddr sdk.AccAddress, toAddr sdk.AccAddress, amt sdk.Coins) error {
+	return k.bk.SendCoins(ctx, fromAddr, toAddr, amt)
+}
+
+func (k EvmBankKeeper) SpendableCoins(ctx sdk.Context, addr sdk.AccAddress) sdk.Coins {
+	return k.bk.SpendableCoins(ctx, addr)
+}
+
 // SplitAkavaCoins splits akava coins to the equivalent ukava coins and any remaining akava balance.
 // An error will be returned if the coins are not valid or if the coins are not the akava denom.
 func SplitAkavaCoins(coins sdk.Coins, evmDenom, cosmosDenom string) (sdk.Coin, sdk.Int, error) {
