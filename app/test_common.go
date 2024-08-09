@@ -6,10 +6,11 @@ import (
 	"testing"
 	"time"
 
-	tmdb "github.com/cometbft/cometbft-db"
+	"cosmossdk.io/log"
+	sdkmath "cosmossdk.io/math"
 	abci "github.com/cometbft/cometbft/abci/types"
-	"github.com/cometbft/cometbft/libs/log"
-	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	tmdb "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
@@ -82,11 +83,11 @@ func NewTestAppFromSealed() TestApp {
 func (tApp TestApp) GetAccountKeeper() authkeeper.AccountKeeper { return tApp.accountKeeper }
 func (tApp TestApp) GetBankKeeper() bankkeeper.Keeper           { return tApp.bankKeeper }
 func (tApp TestApp) GetMintKeeper() mintkeeper.Keeper           { return tApp.mintKeeper }
-func (tApp TestApp) GetStakingKeeper() stakingkeeper.Keeper     { return tApp.stakingKeeper }
+func (tApp TestApp) GetStakingKeeper() *stakingkeeper.Keeper    { return tApp.stakingKeeper }
 func (tApp TestApp) GetSlashingKeeper() slashingkeeper.Keeper   { return tApp.slashingKeeper }
 func (tApp TestApp) GetDistrKeeper() distkeeper.Keeper          { return tApp.distrKeeper }
-func (tApp TestApp) GetGovKeeper() govkeeper.Keeper             { return tApp.govKeeper }
-func (tApp TestApp) GetCrisisKeeper() crisiskeeper.Keeper       { return tApp.crisisKeeper }
+func (tApp TestApp) GetGovKeeper() *govkeeper.Keeper            { return tApp.govKeeper }
+func (tApp TestApp) GetCrisisKeeper() *crisiskeeper.Keeper      { return tApp.crisisKeeper }
 func (tApp TestApp) GetParamsKeeper() paramskeeper.Keeper       { return tApp.paramsKeeper }
 
 func (tApp TestApp) GetEvmutilKeeper() evmutilkeeper.Keeper { return tApp.evmutilKeeper }
@@ -139,14 +140,14 @@ func (tApp TestApp) InitializeFromGenesisStatesWithTimeAndChainIDAndHeight(genTi
 		panic(err)
 	}
 	tApp.InitChain(
-		abci.RequestInitChain{
+		&abci.RequestInitChain{
 			Time:          genTime,
 			Validators:    []abci.ValidatorUpdate{},
 			AppStateBytes: stateBytes,
 			ChainId:       chainID,
 			// Set consensus params, which is needed by x/feemarket
-			ConsensusParams: &abci.ConsensusParams{
-				Block: &abci.BlockParams{
+			ConsensusParams: &cmtproto.ConsensusParams{
+				Block: &cmtproto.BlockParams{
 					MaxBytes: 200000,
 					MaxGas:   20000000,
 				},
@@ -155,10 +156,8 @@ func (tApp TestApp) InitializeFromGenesisStatesWithTimeAndChainIDAndHeight(genTi
 		},
 	)
 	tApp.Commit()
-	tApp.BeginBlock(abci.RequestBeginBlock{
-		Header: tmproto.Header{
-			Height: tApp.LastBlockHeight() + 1, Time: genTime, ChainID: chainID,
-		},
+	tApp.FinalizeBlock(&abci.RequestFinalizeBlock{
+		Height: tApp.LastBlockHeight() + 1, Time: genTime,
 	})
 	return tApp
 }
@@ -202,12 +201,16 @@ func (tApp TestApp) FundModuleAccount(ctx sdk.Context, recipientMod string, amou
 // CreateNewUnbondedValidator creates a new validator in the staking module.
 // New validators are unbonded until the end blocker is run.
 func (tApp TestApp) CreateNewUnbondedValidator(ctx sdk.Context, valAddress sdk.ValAddress, selfDelegation sdkmath.Int) error {
+	denom, err := tApp.stakingKeeper.BondDenom(ctx)
+	if err != nil {
+		return err
+	}
 	msg, err := stakingtypes.NewMsgCreateValidator(
-		valAddress,
+		valAddress.String(),
 		ed25519.GenPrivKey().PubKey(),
-		sdk.NewCoin(tApp.stakingKeeper.BondDenom(ctx), selfDelegation),
+		sdk.NewCoin(denom, selfDelegation),
 		stakingtypes.Description{},
-		stakingtypes.NewCommissionRates(sdk.ZeroDec(), sdk.ZeroDec(), sdk.ZeroDec()),
+		stakingtypes.NewCommissionRates(sdkmath.LegacyZeroDec(), sdkmath.LegacyZeroDec(), sdkmath.LegacyZeroDec()),
 		sdkmath.NewInt(1e6),
 	)
 	if err != nil {

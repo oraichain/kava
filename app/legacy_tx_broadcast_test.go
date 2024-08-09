@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	sdkmath "cosmossdk.io/math"
 	"github.com/golang/mock/gomock"
 	"github.com/kava-labs/kava/app"
 
@@ -51,7 +52,7 @@ func (suite *LegacyTxBroadcastTestSuite) SetupTest() {
 	rpcClient, err := rpchttp.New(suite.rpcServer.URL, "/websocket")
 	suite.Require().NoError(err)
 	suite.ctrl = gomock.NewController(suite.T())
-	suite.accountRetriever = client.MockAccountRetriever{}
+	suite.accountRetriever = &client.MockAccountRetriever{ReturnAccNum: uint64(100), ReturnAccSeq: uint64(101)}
 	encodingConfig := app.MakeEncodingConfig()
 	suite.clientCtx = client.Context{}.
 		WithCodec(encodingConfig.Marshaler).
@@ -120,11 +121,6 @@ func (suite *LegacyTxBroadcastTestSuite) TestSimulateRequest() {
 			Result:  json.RawMessage(result),
 		}
 	}
-
-	// mock account sequence retrieval
-	suite.accountRetriever.EXPECT().
-		GetAccountNumberSequence(suite.clientCtx, fromAddr).
-		Return(uint64(100), uint64(101), nil)
 
 	// amino encode legacy tx
 	requestBody, err := suite.clientCtx.LegacyAmino.MarshalJSON(txReq)

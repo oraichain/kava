@@ -2,15 +2,15 @@ package app
 
 import (
 	"encoding/json"
-	"os"
 	"sort"
 	"testing"
 	"time"
 
-	db "github.com/cometbft/cometbft-db"
+	"cosmossdk.io/log"
 	abci "github.com/cometbft/cometbft/abci/types"
-	"github.com/cometbft/cometbft/libs/log"
 	tmtypes "github.com/cometbft/cometbft/types"
+	db "github.com/cosmos/cosmos-db"
+	simtestutil "github.com/cosmos/cosmos-sdk/testutil/sims"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,7 +18,7 @@ import (
 func TestNewApp(t *testing.T) {
 	SetSDKConfig()
 	NewApp(
-		log.NewTMLogger(log.NewSyncWriter(os.Stdout)),
+		log.NewTestLogger(t),
 		db.NewMemDB(),
 		DefaultNodeHome,
 		nil,
@@ -30,16 +30,16 @@ func TestNewApp(t *testing.T) {
 func TestExport(t *testing.T) {
 	SetSDKConfig()
 	db := db.NewMemDB()
-	app := NewApp(log.NewTMLogger(log.NewSyncWriter(os.Stdout)), db, DefaultNodeHome, nil, MakeEncodingConfig(), DefaultOptions)
+	app := NewApp(log.NewTestLogger(t), db, DefaultNodeHome, nil, MakeEncodingConfig(), DefaultOptions)
 
 	stateBytes, err := json.Marshal(NewDefaultGenesisState())
 	require.NoError(t, err)
 
-	initRequest := abci.RequestInitChain{
+	initRequest := &abci.RequestInitChain{
 		Time:            time.Date(1998, 1, 1, 0, 0, 0, 0, time.UTC),
 		ChainId:         "kavatest_1-1",
 		InitialHeight:   1,
-		ConsensusParams: tmtypes.TM2PB.ConsensusParams(tmtypes.DefaultConsensusParams()),
+		ConsensusParams: simtestutil.DefaultConsensusParams,
 		Validators:      nil,
 		AppStateBytes:   stateBytes,
 	}

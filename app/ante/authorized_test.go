@@ -2,6 +2,9 @@ package ante_test
 
 import (
 	"testing"
+	"time"
+
+	"math/rand"
 
 	helpers "github.com/cosmos/cosmos-sdk/testutil/sims"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -36,7 +39,8 @@ func TestAuthenticatedMempoolDecorator_AnteHandle_NotCheckTx(t *testing.T) {
 	fetcher := mockAddressFetcher(testAddresses[1:]...)
 
 	decorator := ante.NewAuthenticatedMempoolDecorator(fetcher)
-	tx, err := helpers.GenTx(
+	tx, err := helpers.GenSignedMockTx(
+		rand.New(rand.NewSource(time.Now().UnixNano())),
 		txConfig,
 		[]sdk.Msg{
 			banktypes.NewMsgSend(
@@ -70,7 +74,8 @@ func TestAuthenticatedMempoolDecorator_AnteHandle_Pass(t *testing.T) {
 
 	decorator := ante.NewAuthenticatedMempoolDecorator(fetcher)
 
-	tx, err := helpers.GenTx(
+	tx, err := helpers.GenSignedMockTx(
+		rand.New(rand.NewSource(time.Now().UnixNano())),
 		txConfig,
 		[]sdk.Msg{
 			banktypes.NewMsgSend(
@@ -110,7 +115,8 @@ func TestAuthenticatedMempoolDecorator_AnteHandle_Reject(t *testing.T) {
 
 	decorator := ante.NewAuthenticatedMempoolDecorator(fetcher)
 
-	tx, err := helpers.GenTx(
+	tx, err := helpers.GenSignedMockTx(
+		rand.New(rand.NewSource(time.Now().UnixNano())),
 		txConfig,
 		[]sdk.Msg{
 			banktypes.NewMsgSend(

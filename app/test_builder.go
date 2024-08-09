@@ -13,10 +13,10 @@ import (
 // All methods return the builder so method calls can be chained together.
 //
 // Example:
-//     // create a single account genesis state
-//     builder := NewAuthBankGenesisBuilder().WithSimpleAccount(testUserAddress, testCoins)
-//     genesisState := builder.BuildMarshalled()
 //
+//	// create a single account genesis state
+//	builder := NewAuthBankGenesisBuilder().WithSimpleAccount(testUserAddress, testCoins)
+//	genesisState := builder.BuildMarshalled()
 type AuthBankGenesisBuilder struct {
 	AuthGenesis authtypes.GenesisState
 	BankGenesis banktypes.GenesisState
@@ -106,6 +106,9 @@ func newPeriodicVestingAccount(address sdk.AccAddress, periods vestingtypes.Peri
 	}
 	endTime := firstPeriodStartTimestamp + totalPeriods
 
-	baseVestingAccount := vestingtypes.NewBaseVestingAccount(baseAccount, originalVesting, endTime)
+	baseVestingAccount, err := vestingtypes.NewBaseVestingAccount(baseAccount, originalVesting, endTime)
+	if err != nil {
+		panic(err)
+	}
 	return vestingtypes.NewPeriodicVestingAccountRaw(baseVestingAccount, firstPeriodStartTimestamp, periods)
 }

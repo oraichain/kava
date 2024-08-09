@@ -3,6 +3,7 @@ package ante
 import (
 	"fmt"
 
+	errorsmod "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/x/authz"
@@ -26,7 +27,7 @@ func NewAuthzLimiterDecorator(disabledMsgTypes ...string) AuthzLimiterDecorator 
 func (ald AuthzLimiterDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simulate bool, next sdk.AnteHandler) (newCtx sdk.Context, err error) {
 	err = ald.checkForDisabledMsg(tx.GetMsgs(), true)
 	if err != nil {
-		return ctx, sdkerrors.Wrapf(sdkerrors.ErrUnauthorized, "%v", err)
+		return ctx, errorsmod.Wrapf(sdkerrors.ErrUnauthorized, "%v", err)
 	}
 	return next(ctx, tx, simulate)
 }
@@ -49,7 +50,10 @@ func (ald AuthzLimiterDecorator) checkForDisabledMsg(msgs []sdk.Msg, searchOnlyI
 			if !ok {
 				panic("unexpected msg type")
 			}
-			authorization := m.GetAuthorization()
+			authorization, err := m.GetAuthorization()
+			if err != nil {
+				return err
+			}
 			if ald.isDisabled(authorization.MsgTypeURL()) {
 				return fmt.Errorf("found disabled msg type in MsgGrant: %s", authorization.MsgTypeURL())
 			}

@@ -6,10 +6,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"math/rand"
+
 	helpers "github.com/cosmos/cosmos-sdk/testutil/sims"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	vesting "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
-
 	"github.com/kava-labs/kava/app"
 	"github.com/kava-labs/kava/app/ante"
 )
@@ -21,7 +22,8 @@ func TestVestingMempoolDecorator_MsgCreateVestingAccount_Unauthorized(t *testing
 
 	decorator := ante.NewVestingAccountDecorator()
 
-	tx, err := helpers.GenTx(
+	tx, err := helpers.GenSignedMockTx(
+		rand.New(rand.NewSource(time.Now().UnixNano())),
 		txConfig,
 		[]sdk.Msg{
 			vesting.NewMsgCreateVestingAccount(

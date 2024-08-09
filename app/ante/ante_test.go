@@ -1,14 +1,15 @@
 package ante_test
 
 import (
+	"math/rand"
 	"os"
 	"testing"
 	"time"
 
-	tmdb "github.com/cometbft/cometbft-db"
+	errorsmod "cosmossdk.io/errors"
+	"cosmossdk.io/log"
 	abci "github.com/cometbft/cometbft/abci/types"
-	"github.com/cometbft/cometbft/libs/log"
-	"github.com/cosmos/cosmos-sdk/codec"
+	tmdb "github.com/cosmos/cosmos-db"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	helpers "github.com/cosmos/cosmos-sdk/testutil/sims"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -64,8 +65,6 @@ func TestAppAnteHandler_AuthorizedMempool(t *testing.T) {
 			sdk.NewCoins(sdk.NewInt64Coin("ukava", 1e9)),
 			testAddresses,
 		),
-		newBep3GenStateMulti(tApp.AppCodec(), deputy),
-		newPricefeedGenStateMulti(tApp.AppCodec(), oracles),
 	)
 
 	testcases := []struct {
@@ -102,7 +101,8 @@ func TestAppAnteHandler_AuthorizedMempool(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			stdTx, err := helpers.GenTx(
+			stdTx, err := helpers.GenSignedMockTx(
+				rand.New(rand.NewSource(time.Now().UnixNano())),
 				encodingConfig.TxConfig,
 				[]sdk.Msg{
 					banktypes.NewMsgSend(
@@ -122,12 +122,13 @@ func TestAppAnteHandler_AuthorizedMempool(t *testing.T) {
 			txBytes, err := encodingConfig.TxConfig.TxEncoder()(stdTx)
 			require.NoError(t, err)
 
-			res := tApp.CheckTx(
-				abci.RequestCheckTx{
+			res, err := tApp.CheckTx(
+				&abci.RequestCheckTx{
 					Tx:   txBytes,
 					Type: abci.CheckTxType_New,
 				},
 			)
+			require.NoError(t, err)
 
 			if tc.expectPass {
 				require.Zero(t, res.Code, res.Log)
@@ -138,63 +139,16 @@ func TestAppAnteHandler_AuthorizedMempool(t *testing.T) {
 	}
 }
 
-func newPricefeedGenStateMulti(cdc codec.JSONCodec, oracles []sdk.AccAddress) app.GenesisState {
-	pfGenesis := pricefeedtypes.GenesisState{
-		Params: pricefeedtypes.Params{
-			Markets: []pricefeedtypes.Market{
-				{MarketID: "btc:usd", BaseAsset: "btc", QuoteAsset: "usd", Oracles: oracles, Active: true},
-			},
-		},
-	}
-	return app.GenesisState{pricefeedtypes.ModuleName: cdc.MustMarshalJSON(&pfGenesis)}
-}
-
-func newBep3GenStateMulti(cdc codec.JSONCodec, deputyAddress sdk.AccAddress) app.GenesisState {
-	bep3Genesis := bep3types.GenesisState{
-		Params: bep3types.Params{
-			AssetParams: bep3types.AssetParams{
-				bep3types.AssetParam{
-					Denom:  "bnb",
-					CoinID: 714,
-					SupplyLimit: bep3types.SupplyLimit{
-						Limit:          sdkmath.NewInt(350000000000000),
-						TimeLimited:    false,
-						TimeBasedLimit: sdkmath.ZeroInt(),
-						TimePeriod:     time.Hour,
-					},
-					Active:        true,
-					DeputyAddress: deputyAddress,
-					FixedFee:      sdkmath.NewInt(1000),
-					MinSwapAmount: sdk.OneInt(),
-					MaxSwapAmount: sdkmath.NewInt(1000000000000),
-					MinBlockLock:  bep3types.DefaultMinBlockLock,
-					MaxBlockLock:  bep3types.DefaultMaxBlockLock,
-				},
-			},
-		},
-		Supplies: bep3types.AssetSupplies{
-			bep3types.NewAssetSupply(
-				sdk.NewCoin("bnb", sdkmath.ZeroInt()),
-				sdk.NewCoin("bnb", sdkmath.ZeroInt()),
-				sdk.NewCoin("bnb", sdkmath.ZeroInt()),
-				sdk.NewCoin("bnb", sdkmath.ZeroInt()),
-				time.Duration(0),
-			),
-		},
-		PreviousBlockTime: bep3types.DefaultPreviousBlockTime,
-	}
-	return app.GenesisState{bep3types.ModuleName: cdc.MustMarshalJSON(&bep3Genesis)}
-}
-
 func TestAppAnteHandler_RejectMsgsInAuthz(t *testing.T) {
 	testPrivKeys, testAddresses := app.GeneratePrivKeyAddressPairs(10)
 
+	expiration := time.Date(9000, 1, 1, 0, 0, 0, 0, time.UTC)
 	newMsgGrant := func(msgTypeUrl string) *authz.MsgGrant {
 		msg, err := authz.NewMsgGrant(
 			testAddresses[0],
 			testAddresses[1],
 			authz.NewGenericAuthorization(msgTypeUrl),
-			time.Date(9000, 1, 1, 0, 0, 0, 0, time.UTC),
+			&expiration,
 		)
 		if err != nil {
 			panic(err)
@@ -222,6 +176,7 @@ func TestAppAnteHandler_RejectMsgsInAuthz(t *testing.T) {
 		},
 	}
 
+	txEncoder := encodingConfig.TxConfig.TxEncoder()
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			tApp := app.NewTestApp()
@@ -231,7 +186,8 @@ func TestAppAnteHandler_RejectMsgsInAuthz(t *testing.T) {
 				chainID,
 			)
 
-			stdTx, err := helpers.GenTx(
+			stdTx, err := helpers.GenSignedMockTx(
+				rand.New(rand.NewSource(time.Now().UnixNano())),
 				encodingConfig.TxConfig,
 				[]sdk.Msg{tc.msg},
 				sdk.NewCoins(), // no fee
@@ -242,23 +198,24 @@ func TestAppAnteHandler_RejectMsgsInAuthz(t *testing.T) {
 				testPrivKeys[0],
 			)
 			require.NoError(t, err)
-			txBytes, err := encodingConfig.TxConfig.TxEncoder()(stdTx)
+			txBytes, err := txEncoder(stdTx)
 			require.NoError(t, err)
 
-			resCheckTx := tApp.CheckTx(
-				abci.RequestCheckTx{
+			resCheckTx, err := tApp.CheckTx(
+				&abci.RequestCheckTx{
 					Tx:   txBytes,
 					Type: abci.CheckTxType_New,
 				},
 			)
+			require.NoError(t, err)
 			require.Equal(t, resCheckTx.Code, tc.expectedCode, resCheckTx.Log)
 
-			resDeliverTx := tApp.DeliverTx(
-				abci.RequestDeliverTx{
-					Tx: txBytes,
-				},
+			_, result, err := tApp.SimDeliver(
+				txEncoder,
+				stdTx,
 			)
-			require.Equal(t, resDeliverTx.Code, tc.expectedCode, resDeliverTx.Log)
+			_, code, _ := errorsmod.ABCIInfo(err, false)
+			require.Equal(t, code, tc.expectedCode, result.Log)
 		})
 	}
 }

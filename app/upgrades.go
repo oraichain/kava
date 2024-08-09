@@ -1,11 +1,13 @@
 package app
 
 import (
+	"context"
+
+	sdkmath "cosmossdk.io/math"
 	storetypes "cosmossdk.io/store/types"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 	dbm "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/cosmos-sdk/baseapp"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	distrkeeper "github.com/cosmos/cosmos-sdk/x/distribution/keeper"
 	mintkeeper "github.com/cosmos/cosmos-sdk/x/mint/keeper"
@@ -52,7 +54,7 @@ func (app App) RegisterUpgradeHandlers(db dbm.DB) {
 // TestnetStoreLoader removes the previous iavl tree for the mint module, ensuring even store heights without
 // modifications to iavl to support non-consecutive versions and deletion of all nodes for a new tree at the upgrade height
 func TestnetStoreLoader(app App, db dbm.DB, upgradeHeight int64, storeUpgrades *storetypes.StoreUpgrades) baseapp.StoreLoader {
-	return func(ms sdk.CommitMultiStore) error {
+	return func(ms storetypes.CommitMultiStore) error {
 		// if this is the upgrade height, delete all remnant x/mint store versions to ensure we start from clean slate
 		if upgradeHeight == ms.LastCommitID().Version+1 {
 			app.Logger().Info("removing x/mint historic versions from store")
@@ -89,7 +91,7 @@ func TestnetStoreLoader(app App, db dbm.DB, upgradeHeight int64, storeUpgrades *
 // MainnetUpgradeHandler does nothing. No state changes are necessary on mainnet because v0.20.0 was
 // never released and its upgrade handler was never run.
 func MainnetUpgradeHandler(app App) upgradetypes.UpgradeHandler {
-	return func(ctx sdk.Context, plan upgradetypes.Plan, fromVM module.VersionMap) (module.VersionMap, error) {
+	return func(ctx context.Context, plan upgradetypes.Plan, fromVM module.VersionMap) (module.VersionMap, error) {
 		// no-op
 		app.Logger().Info("running mainnet upgrade handler")
 		return app.mm.RunMigrations(ctx, app.configurator, fromVM)
@@ -101,7 +103,7 @@ func MainnetUpgradeHandler(app App) upgradetypes.UpgradeHandler {
 // in this upgrade.
 // See original handler here: https://github.com/Kava-Labs/kava/blob/v0.20.0-alpha.0/app/upgrades.go#L65
 func TestnetUpgradeHandler(app App) upgradetypes.UpgradeHandler {
-	return func(ctx sdk.Context, plan upgradetypes.Plan, fromVM module.VersionMap) (module.VersionMap, error) {
+	return func(ctx context.Context, plan upgradetypes.Plan, fromVM module.VersionMap) (module.VersionMap, error) {
 		app.Logger().Info("running testnet upgrade handler")
 
 		// move community pool funds back to community pool from community module.
@@ -129,24 +131,31 @@ func TestnetUpgradeHandler(app App) upgradetypes.UpgradeHandler {
 }
 
 // ReenableCommunityTax sets x/distribution's community_tax to the value currently on mainnet.
-func ReenableCommunityTax(ctx sdk.Context, distrKeeper distrkeeper.Keeper) {
-	params := distrKeeper.GetParams(ctx)
-	params.CommunityTax = sdk.MustNewDecFromStr("0.925000000000000000") // community tax currently present on mainnet
-	distrKeeper.SetParams(ctx, params)
+func ReenableCommunityTax(ctx context.Context, distrKeeper distrkeeper.Keeper) {
+	params, err := distrKeeper.Params.Get(ctx)
+	if err != nil {
+		panic(err)
+	}
+	params.CommunityTax = sdkmath.LegacyMustNewDecFromStr("0.925000000000000000") // community tax currently present on mainnet
+	distrKeeper.Params.Set(ctx, params)
 }
 
 // InitializeMintState sets up the parameters and state of x/mint.
 func InitializeMintState(
-	ctx sdk.Context,
+	ctx context.Context,
 	mintKeeper mintkeeper.Keeper,
-	stakingKeeper stakingkeeper.Keeper,
+	stakingKeeper *stakingkeeper.Keeper,
 ) {
+	var err error
 	// init params for x/mint with values from mainnet
-	inflationRate := sdk.MustNewDecFromStr("0.750000000000000000")
+	inflationRate := sdkmath.LegacyMustNewDecFromStr("0.750000000000000000")
 	params := minttypes.DefaultParams()
-	params.MintDenom = stakingKeeper.BondDenom(ctx)
+	params.MintDenom, err = stakingKeeper.BondDenom(ctx)
+	if err != nil {
+		panic(err)
+	}
 	params.InflationMax = inflationRate
 	params.InflationMin = inflationRate
 
-	mintKeeper.SetParams(ctx, params)
+	mintKeeper.Params.Set(ctx, params)
 }
