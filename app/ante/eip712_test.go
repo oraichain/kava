@@ -62,9 +62,9 @@ type EIP712TestSuite struct {
 	usdcEVMAddr   evmutiltypes.InternalEVMAddress
 }
 
-func (suite *EIP712TestSuite) getEVMAmount(amount int64) sdk.Int {
+func (suite *EIP712TestSuite) getEVMAmount(amount int64) sdkmath.Int {
 	incr := sdk.RelativePow(sdk.NewUint(10), sdk.NewUint(18), sdk.OneUint())
-	return sdk.NewInt(amount).Mul(sdk.NewIntFromUint64(incr.Uint64()))
+	return sdkmath.NewInt(amount).Mul(sdk.NewIntFromUint64(incr.Uint64()))
 }
 
 func (suite *EIP712TestSuite) createTestEIP712CosmosTxBuilder(
@@ -172,11 +172,11 @@ func (suite *EIP712TestSuite) SetupTest() {
 			StabilityFee:                     sdk.OneDec(),
 			AuctionSize:                      sdk.NewIntFromUint64(10000000000),
 			LiquidationPenalty:               sdk.MustNewDecFromStr("0.05"),
-			CheckCollateralizationIndexCount: sdk.NewInt(10),
+			CheckCollateralizationIndexCount: sdkmath.NewInt(10),
 			KeeperRewardPercentage:           sdk.MustNewDecFromStr("0.01"),
 			SpotMarketID:                     "usdc:usd",
 			LiquidationMarketID:              "usdc:usd:30",
-			ConversionFactor:                 sdk.NewInt(18),
+			ConversionFactor:                 sdkmath.NewInt(18),
 		},
 	}
 
@@ -190,7 +190,7 @@ func (suite *EIP712TestSuite) SetupTest() {
 				LoanToValue:  sdk.MustNewDecFromStr("1"),
 			},
 			SpotMarketID:     "usdx:usd",
-			ConversionFactor: sdk.NewInt(1_000_000),
+			ConversionFactor: sdkmath.NewInt(1_000_000),
 			InterestRateModel: hardtypes.InterestRateModel{
 				BaseRateAPY:    sdk.MustNewDecFromStr("0.05"),
 				BaseMultiplier: sdk.MustNewDecFromStr("2"),
@@ -344,7 +344,7 @@ func (suite *EIP712TestSuite) SetupTest() {
 			ValueTypes: []evmtypes.EIP712MsgAttrType{
 				{Name: "initiator", Type: "string"},
 				{Name: "receiver", Type: "string"},
-				{Name: "kava_erc20_address", Type: "string"},
+				{Name: "orai_erc20_address", Type: "string"},
 				{Name: "amount", Type: "string"},
 			},
 		},
@@ -447,7 +447,7 @@ func (suite *EIP712TestSuite) deployUSDCERC20(app app.TestApp, ctx sdk.Context) 
 	suite.tApp.FundModuleAccount(
 		suite.ctx,
 		evmutiltypes.ModuleName,
-		sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(0))),
+		sdk.NewCoins(sdk.NewCoin("ukava", sdkmath.NewInt(0))),
 	)
 
 	contractAddr, err := suite.evmutilKeeper.DeployTestMintableERC20Contract(suite.ctx, "USDC", "USDC", uint8(18))
@@ -556,7 +556,7 @@ func (suite *EIP712TestSuite) TestEIP712Tx() {
 			failCheckTx:    true,
 			errMsg:         "invalid chain-id",
 			updateTx: func(txBuilder client.TxBuilder, msgs []sdk.Msg) client.TxBuilder {
-				gasAmt := sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(20)))
+				gasAmt := sdk.NewCoins(sdk.NewCoin("ukava", sdkmath.NewInt(20)))
 				return suite.createTestEIP712CosmosTxBuilder(
 					suite.testAddr, suite.testPrivKey, "kavatest_12-1", uint64(helpers.DefaultGenTxGas*10), gasAmt, msgs,
 				)
@@ -569,7 +569,7 @@ func (suite *EIP712TestSuite) TestEIP712Tx() {
 			failCheckTx:    true,
 			errMsg:         "invalid pubkey",
 			updateTx: func(txBuilder client.TxBuilder, msgs []sdk.Msg) client.TxBuilder {
-				gasAmt := sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(20)))
+				gasAmt := sdk.NewCoins(sdk.NewCoin("ukava", sdkmath.NewInt(20)))
 				return suite.createTestEIP712CosmosTxBuilder(
 					suite.testAddr2, suite.testPrivKey2, ChainID, uint64(helpers.DefaultGenTxGas*10), gasAmt, msgs,
 				)
@@ -589,7 +589,7 @@ func (suite *EIP712TestSuite) TestEIP712Tx() {
 				suite.usdcEVMAddr,
 				usdcAmt,
 			)
-			usdxAmt := sdk.NewInt(1_000_000).Mul(sdk.NewInt(tc.usdxToMintAmt))
+			usdxAmt := sdkmath.NewInt(1_000_000).Mul(sdkmath.NewInt(tc.usdxToMintAmt))
 			mintMsg := cdptypes.NewMsgCreateCDP(
 				suite.testAddr,
 				sdk.NewCoin(USDCCoinDenom, usdcAmt),
@@ -609,7 +609,7 @@ func (suite *EIP712TestSuite) TestEIP712Tx() {
 				msgs = tc.updateMsgs(msgs)
 			}
 
-			gasAmt := sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(20)))
+			gasAmt := sdk.NewCoins(sdk.NewCoin("ukava", sdkmath.NewInt(20)))
 			txBuilder := suite.createTestEIP712CosmosTxBuilder(
 				suite.testAddr, suite.testPrivKey, ChainID, uint64(helpers.DefaultGenTxGas*10), gasAmt, msgs,
 			)
@@ -644,20 +644,20 @@ func (suite *EIP712TestSuite) TestEIP712Tx() {
 				// validate user cosmos erc20/usd balance
 				bk := suite.tApp.GetBankKeeper()
 				amt := bk.GetBalance(suite.ctx, suite.testAddr, USDCCoinDenom)
-				suite.Require().Equal(sdk.ZeroInt(), amt.Amount)
+				suite.Require().Equal(sdkmath.ZeroInt(), amt.Amount)
 
 				// validate cdp
 				cdp, found := suite.tApp.GetCDPKeeper().GetCdpByOwnerAndCollateralType(suite.ctx, suite.testAddr, USDCCDPType)
 				suite.Require().True(found)
 				suite.Require().Equal(suite.testAddr, cdp.Owner)
 				suite.Require().Equal(sdk.NewCoin(USDCCoinDenom, suite.getEVMAmount(100)), cdp.Collateral)
-				suite.Require().Equal(sdk.NewCoin("usdx", sdk.NewInt(99_000_000)), cdp.Principal)
+				suite.Require().Equal(sdk.NewCoin("usdx", sdkmath.NewInt(99_000_000)), cdp.Principal)
 
 				// validate hard
 				hardDeposit, found := suite.tApp.GetHardKeeper().GetDeposit(suite.ctx, suite.testAddr)
 				suite.Require().True(found)
 				suite.Require().Equal(suite.testAddr, hardDeposit.Depositor)
-				suite.Require().Equal(sdk.NewCoins(sdk.NewCoin("usdx", sdk.NewInt(99_000_000))), hardDeposit.Amount)
+				suite.Require().Equal(sdk.NewCoins(sdk.NewCoin("usdx", sdkmath.NewInt(99_000_000))), hardDeposit.Amount)
 			} else {
 				suite.Require().NotEqual(resDeliverTx.Code, uint32(0), resCheckTx.Log)
 				suite.Require().Contains(resDeliverTx.Log, tc.errMsg)
@@ -677,7 +677,7 @@ func (suite *EIP712TestSuite) TestEIP712Tx_DepositAndWithdraw() {
 		suite.usdcEVMAddr,
 		usdcAmt,
 	)
-	usdxAmt := sdk.NewInt(1_000_000).Mul(sdk.NewInt(99))
+	usdxAmt := sdkmath.NewInt(1_000_000).Mul(sdkmath.NewInt(99))
 	mintMsg := cdptypes.NewMsgCreateCDP(
 		suite.testAddr,
 		sdk.NewCoin(USDCCoinDenom, usdcAmt),
@@ -695,7 +695,7 @@ func (suite *EIP712TestSuite) TestEIP712Tx_DepositAndWithdraw() {
 	}
 
 	// deliver deposit msg
-	gasAmt := sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(20)))
+	gasAmt := sdk.NewCoins(sdk.NewCoin("ukava", sdkmath.NewInt(20)))
 	txBuilder := suite.createTestEIP712CosmosTxBuilder(
 		suite.testAddr, suite.testPrivKey, ChainID, uint64(helpers.DefaultGenTxGas*10), gasAmt, depositMsgs,
 	)
@@ -712,7 +712,7 @@ func (suite *EIP712TestSuite) TestEIP712Tx_DepositAndWithdraw() {
 	hardDeposit, found := suite.tApp.GetHardKeeper().GetDeposit(suite.ctx, suite.testAddr)
 	suite.Require().True(found)
 	suite.Require().Equal(suite.testAddr, hardDeposit.Depositor)
-	suite.Require().Equal(sdk.NewCoins(sdk.NewCoin("usdx", sdk.NewInt(99_000_000))), hardDeposit.Amount)
+	suite.Require().Equal(sdk.NewCoins(sdk.NewCoin("usdx", sdkmath.NewInt(99_000_000))), hardDeposit.Amount)
 
 	// validate erc20 balance
 	coinBal, err := suite.evmutilKeeper.QueryERC20BalanceOf(suite.ctx, suite.usdcEVMAddr, suite.testEVMAddr)
@@ -762,7 +762,7 @@ func (suite *EIP712TestSuite) TestEIP712Tx_DepositAndWithdraw() {
 	// validate user cosmos erc20/usd balance
 	bk := suite.tApp.GetBankKeeper()
 	amt := bk.GetBalance(suite.ctx, suite.testAddr, USDCCoinDenom)
-	suite.Require().Equal(sdk.ZeroInt(), amt.Amount)
+	suite.Require().Equal(sdkmath.ZeroInt(), amt.Amount)
 
 	// validate erc20 balance
 	coinBal, err = suite.evmutilKeeper.QueryERC20BalanceOf(suite.ctx, suite.usdcEVMAddr, suite.testEVMAddr)

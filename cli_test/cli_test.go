@@ -444,7 +444,7 @@ func TestKvCLICreateValidator(t *testing.T) {
 	// Ensure that validator state is as expected
 	validator := f.QueryStakingValidator(barVal)
 	require.Equal(t, validator.OperatorAddress, barVal)
-	require.True(sdk.IntEq(t, newValTokens, validator.Tokens))
+	require.True(sdkmath.IntEq(t, newValTokens, validator.Tokens))
 
 	// Query delegations to the validator
 	validatorDelegations := f.QueryStakingDelegationsTo(barVal)
@@ -515,7 +515,7 @@ func TestKvCLIQuerySupply(t *testing.T) {
 	totalSupplyOf := f.QueryTotalSupplyOf(fooDenom)
 
 	require.Equal(t, totalCoins, totalSupply)
-	require.True(sdk.IntEq(t, totalCoins.AmountOf(fooDenom), totalSupplyOf))
+	require.True(sdkmath.IntEq(t, totalCoins.AmountOf(fooDenom), totalSupplyOf))
 
 	f.Cleanup()
 }

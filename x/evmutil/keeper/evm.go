@@ -18,8 +18,9 @@ import (
 	"encoding/json"
 	"math/big"
 
+	errorsmod "cosmossdk.io/errors"
+	storetypes "cosmossdk.io/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -42,15 +43,15 @@ func (k Keeper) CallEVM(
 ) (*evmtypes.MsgEthereumTxResponse, error) {
 	data, err := abi.Pack(method, args...)
 	if err != nil {
-		return nil, sdkerrors.Wrap(
+		return nil, errorsmod.Wrap(
 			types.ErrABIPack,
-			sdkerrors.Wrap(err, "failed to create transaction data").Error(),
+			errorsmod.Wrap(err, "failed to create transaction data").Error(),
 		)
 	}
 
 	resp, err := k.CallEVMWithData(ctx, from, &contract, data)
 	if err != nil {
-		return nil, sdkerrors.Wrapf(err, "contract call failed: method '%s', contract '%s'", method, contract)
+		return nil, errorsmod.Wrapf(err, "contract call failed: method '%s', contract '%s'", method, contract)
 	}
 	return resp, nil
 }
@@ -72,7 +73,7 @@ func (k Keeper) CallEVMWithData(
 	// To param needs to be nil to correctly apply txs to create contracts
 	// Default common.Address value is 0x0000000000000000000000000000000000000000, not nil
 	// which Ethermint handles differently -- erc20_test will fail
-	// https://github.com/evmos/ethermint/blob/caa1c5a6c6b7ed8ba4aaf6e0b0848f6be5ba6668/x/evm/keeper/state_transition.go#L357
+	// https://github.com/CosmWasm/wasmd/blob/caa1c5a6c6b7ed8ba4aaf6e0b0848f6be5ba6668/x/evm/keeper/state_transition.go#L357
 	var to *common.Address
 	if contract != nil {
 		to = &contract.Address
@@ -89,7 +90,7 @@ func (k Keeper) CallEVMWithData(
 		return nil, err
 	}
 
-	ethGasContext := ctx.WithGasMeter(sdk.NewInfiniteGasMeter())
+	ethGasContext := ctx.WithGasMeter(storetypes.NewInfiniteGasMeter())
 
 	// EstimateGas applies the transaction against current block state to get
 	// optimal gas value. Since this is done right before the ApplyMessage
@@ -98,12 +99,12 @@ func (k Keeper) CallEVMWithData(
 	// accurate exact amount in this case, as both the chain state and tx used
 	// to estimate and apply are the exact same (ie. no txs between estimate and
 	// apply, tx order is the same, etc.)
-	gasRes, err := k.evmKeeper.EstimateGas(sdk.WrapSDKContext(ethGasContext), &evmtypes.EthCallRequest{
+	gasRes, err := k.evmKeeper.EstimateGas(ethGasContext, &evmtypes.EthCallRequest{
 		Args:   args,
 		GasCap: config.DefaultGasCap,
 	})
 	if err != nil {
-		return nil, sdkerrors.Wrap(evmtypes.ErrVMExecution, err.Error())
+		return nil, errorsmod.Wrap(evmtypes.ErrVMExecution, err.Error())
 	}
 
 	msg := ethtypes.NewMessage(
@@ -126,7 +127,7 @@ func (k Keeper) CallEVMWithData(
 	}
 
 	if res.Failed() {
-		return nil, sdkerrors.Wrap(evmtypes.ErrVMExecution, res.VmError)
+		return nil, errorsmod.Wrap(evmtypes.ErrVMExecution, res.VmError)
 	}
 
 	ctx.GasMeter().ConsumeGas(res.GasUsed, "evm gas consumed")
@@ -146,7 +147,7 @@ func (k Keeper) monitorApprovalEvent(res *evmtypes.MsgEthereumTxResponse) error 
 
 	for _, log := range res.Logs {
 		if log.Topics[0] == logApprovalSigHash.Hex() {
-			return sdkerrors.Wrapf(
+			return errorsmod.Wrapf(
 				types.ErrUnexpectedContractEvent, "unexpected contract Approval event",
 			)
 		}

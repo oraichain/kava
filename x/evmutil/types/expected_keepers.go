@@ -12,17 +12,15 @@ import (
 // AccountKeeper defines the expected account keeper interface
 type AccountKeeper interface {
 	GetModuleAddress(moduleName string) sdk.AccAddress
-	GetSequence(sdk.Context, sdk.AccAddress) (uint64, error)
+	GetSequence(context.Context, sdk.AccAddress) (uint64, error)
 }
 
 // BankKeeper defines the expected bank keeper interface
 type BankKeeper interface {
 	evmtypes.BankKeeper
-
-	GetSupply(ctx sdk.Context, denom string) sdk.Coin
-	SpendableCoins(ctx sdk.Context, addr sdk.AccAddress) sdk.Coins
-	SendCoins(ctx sdk.Context, fromAddr sdk.AccAddress, toAddr sdk.AccAddress, amt sdk.Coins) error
-	LockedCoins(ctx sdk.Context, addr sdk.AccAddress) sdk.Coins
+	SpendableCoins(ctx context.Context, addr sdk.AccAddress) sdk.Coins
+	GetSupply(ctx context.Context, denom string) sdk.Coin
+	LockedCoins(ctx context.Context, addr sdk.AccAddress) sdk.Coins
 }
 
 // EvmKeeper defines the expected interface needed to make EVM transactions.

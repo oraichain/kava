@@ -3,6 +3,7 @@ package utils
 import (
 	"time"
 
+	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	v040vesting "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
 )
@@ -38,11 +39,11 @@ func ResetPeriodicVestingAccount(vacc *v040vesting.PeriodicVestingAccount, start
 	// If the new original vesting amount is less than the delegated vesting amount, set delegated vesting
 	// to the new original vesting amount, and add the difference to the delegated free amount
 	for _, delegatedVestingCoin := range vacc.DelegatedVesting {
-		newDelegatedVestingCoin := sdk.NewCoin(delegatedVestingCoin.Denom, sdk.MinInt(delegatedVestingCoin.Amount, newOriginalVesting.AmountOf(delegatedVestingCoin.Denom)))
+		newDelegatedVestingCoin := sdk.NewCoin(delegatedVestingCoin.Denom, sdkmath.MinInt(delegatedVestingCoin.Amount, newOriginalVesting.AmountOf(delegatedVestingCoin.Denom)))
 		delegationAdjustment := delegatedVestingCoin.Sub(newDelegatedVestingCoin)
 
 		if !delegationAdjustment.IsZero() {
-			vacc.DelegatedVesting = vacc.DelegatedVesting.Sub(sdk.NewCoins(delegationAdjustment))
+			vacc.DelegatedVesting = vacc.DelegatedVesting.Sub(delegationAdjustment)
 			vacc.DelegatedFree = vacc.DelegatedFree.Add(delegationAdjustment)
 		}
 	}

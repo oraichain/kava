@@ -1,9 +1,9 @@
 package keeper
 
 import (
+	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-
 	"github.com/kava-labs/kava/x/evmutil/types"
 )
 
@@ -37,7 +37,7 @@ func FullyBackedInvariant(bankK types.BankKeeper, k Keeper) sdk.Invariant {
 	message := sdk.FormatInvariant(types.ModuleName, "fully backed broken", "sum of minor balances greater than module account")
 
 	return func(ctx sdk.Context) (string, bool) {
-		totalMinorBalances := sdk.ZeroInt()
+		totalMinorBalances := sdkmath.ZeroInt()
 		k.IterateAllAccounts(ctx, func(acc types.Account) bool {
 			totalMinorBalances = totalMinorBalances.Add(acc.Balance)
 			return false

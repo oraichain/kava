@@ -3,12 +3,11 @@ package types_test
 import (
 	"testing"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
+	sdkmath "cosmossdk.io/math"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/stretchr/testify/require"
-
 	"github.com/kava-labs/kava/app"
 	"github.com/kava-labs/kava/x/evmutil/types"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGenesisState_Validate(t *testing.T) {
@@ -22,30 +21,30 @@ func TestGenesisState_Validate(t *testing.T) {
 		{
 			name: "dup addresses",
 			accounts: []types.Account{
-				{Address: addrs[0], Balance: sdk.NewInt(100)},
-				{Address: addrs[0], Balance: sdk.NewInt(150)},
+				{Address: addrs[0], Balance: sdkmath.NewInt(100)},
+				{Address: addrs[0], Balance: sdkmath.NewInt(150)},
 			},
 			success: false,
 		},
 		{
 			name: "empty account address",
 			accounts: []types.Account{
-				{Balance: sdk.NewInt(100)},
+				{Balance: sdkmath.NewInt(100)},
 			},
 			success: false,
 		},
 		{
 			name: "negative account balance",
 			accounts: []types.Account{
-				{Address: addrs[0], Balance: sdk.NewInt(-100)},
+				{Address: addrs[0], Balance: sdkmath.NewInt(-100)},
 			},
 			success: false,
 		},
 		{
 			name: "invalid params",
 			accounts: []types.Account{
-				{Address: addrs[0], Balance: sdk.NewInt(100)},
-				{Address: addrs[1], Balance: sdk.NewInt(150)},
+				{Address: addrs[0], Balance: sdkmath.NewInt(100)},
+				{Address: addrs[1], Balance: sdkmath.NewInt(150)},
 			},
 			params: types.NewParams(types.NewConversionPairs(
 				types.NewConversionPair(types.NewInternalEVMAddress(common.HexToAddress("0xinvalidaddress")), "weth"),
@@ -55,8 +54,8 @@ func TestGenesisState_Validate(t *testing.T) {
 		{
 			name: "valid state",
 			accounts: []types.Account{
-				{Address: addrs[0], Balance: sdk.NewInt(100)},
-				{Address: addrs[1], Balance: sdk.NewInt(150)},
+				{Address: addrs[0], Balance: sdkmath.NewInt(100)},
+				{Address: addrs[1], Balance: sdkmath.NewInt(150)},
 			},
 			success: true,
 		},

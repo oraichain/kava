@@ -79,8 +79,8 @@ func (suite *LegacyTxBroadcastTestSuite) TestSimulateRequest() {
 	suite.Require().NoError(err)
 
 	// build a legacy transaction
-	msgs := []sdk.Msg{banktypes.NewMsgSend(fromAddr, toAddr, sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(1e6))))}
-	fee := legacytx.NewStdFee(1e6, sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(5e4))))
+	msgs := []sdk.Msg{banktypes.NewMsgSend(fromAddr, toAddr, sdk.NewCoins(sdk.NewCoin("ukava", sdkmath.NewInt(1e6))))}
+	fee := legacytx.NewStdFee(1e6, sdk.NewCoins(sdk.NewCoin("ukava", sdkmath.NewInt(5e4))))
 	sigs := []legacytx.StdSignature{legacytx.NewStdSignature(pk, []byte("an amino json signed signature"))}
 	stdTx := legacytx.NewStdTx(msgs, fee, sigs, "legacy broadcast test")
 	stdTx.TimeoutHeight = 100000

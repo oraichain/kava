@@ -31,8 +31,8 @@ message Params {
   ];
 }
 
-// ChainConfig defines the Ethereum ChainConfig parameters using *sdk.Int values
-// instead of *big.Int.
+// ChainConfig defines the Ethereum ChainConfig parameters using *sdkmath.Int
+// values instead of *big.Int.
 message ChainConfig {
   // Homestead switch block (nil no fork, 0 = already homestead)
   string homestead_block = 1 [
@@ -117,7 +117,8 @@ message ChainConfig {
     (gogoproto.customtype) = "github.com/cosmos/cosmos-sdk/types.Int",
     (gogoproto.moretags) = "yaml:\"arrow_glacier_block\""
   ];
-  // EIP-3675 (TheMerge) switch block (nil = no fork, 0 = already in merge proceedings)
+  // EIP-3675 (TheMerge) switch block (nil = no fork, 0 = already in merge
+  // proceedings)
   string merge_fork_block = 19 [
     (gogoproto.customtype) = "github.com/cosmos/cosmos-sdk/types.Int",
     (gogoproto.moretags) = "yaml:\"merge_fork_block\""
@@ -245,10 +246,11 @@ message EIP712AllowedMsg {
   string msg_value_type_name = 2;
 
   // types of the msg value
-  repeated EIP712MsgAttrType value_types = 3 [(gogoproto.nullable) = false];
+  repeated EIP712MsgAttrType value_types = 3 [ (gogoproto.nullable) = false ];
 
   // nested types of the msg value
-  repeated EIP712NestedMsgType nested_types = 4 [(gogoproto.nullable) = false];
+  repeated EIP712NestedMsgType nested_types = 4
+      [ (gogoproto.nullable) = false ];
 }
 
 // EIP712MsgType is the eip712 type of a single message.
@@ -257,7 +259,7 @@ message EIP712NestedMsgType {
   string name = 1;
 
   // attrs of the nested type
-  repeated EIP712MsgAttrType attrs = 2 [(gogoproto.nullable) = false];
+  repeated EIP712MsgAttrType attrs = 2 [ (gogoproto.nullable) = false ];
 }
 
 // EIP712MsgAttrType is the eip712 type of a single message attribute.

@@ -3,9 +3,8 @@ package keeper
 import (
 	"bytes"
 
+	errorsmod "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-
 	"github.com/kava-labs/kava/x/evmutil/types"
 )
 
@@ -27,12 +26,12 @@ func (k Keeper) GetEnabledConversionPairFromERC20Address(
 ) (types.ConversionPair, error) {
 	params := k.GetParams(ctx)
 	for _, pair := range params.EnabledConversionPairs {
-		if bytes.Equal(pair.KavaERC20Address, address.Bytes()) {
+		if bytes.Equal(pair.OraiERC20Address, address.Bytes()) {
 			return pair, nil
 		}
 	}
 
-	return types.ConversionPair{}, sdkerrors.Wrap(types.ErrConversionNotEnabled, address.String())
+	return types.ConversionPair{}, errorsmod.Wrap(types.ErrConversionNotEnabled, address.String())
 }
 
 // GetEnabledConversionPairFromDenom returns an ConversionPair from the sdk.Coin denom.
@@ -47,5 +46,5 @@ func (k Keeper) GetEnabledConversionPairFromDenom(
 		}
 	}
 
-	return types.ConversionPair{}, sdkerrors.Wrap(types.ErrConversionNotEnabled, denom)
+	return types.ConversionPair{}, errorsmod.Wrap(types.ErrConversionNotEnabled, denom)
 }

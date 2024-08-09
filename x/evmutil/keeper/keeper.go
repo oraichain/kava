@@ -1,8 +1,12 @@
 package keeper
 
 import (
+	"context"
 	"fmt"
 
+	errorsmod "cosmossdk.io/errors"
+	sdkmath "cosmossdk.io/math"
+	storetypes "cosmossdk.io/store/types"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -15,7 +19,7 @@ import (
 // This keeper stores additional data related to evm accounts.
 type Keeper struct {
 	cdc           codec.Codec
-	storeKey      sdk.StoreKey
+	storeKey      storetypes.StoreKey
 	paramSubspace paramtypes.Subspace
 	bankKeeper    types.BankKeeper
 	evmKeeper     types.EvmKeeper
@@ -25,7 +29,7 @@ type Keeper struct {
 // NewKeeper creates an evmutil keeper.
 func NewKeeper(
 	cdc codec.Codec,
-	storeKey sdk.StoreKey,
+	storeKey storetypes.StoreKey,
 	params paramtypes.Subspace,
 	bk types.BankKeeper,
 	ak types.AccountKeeper,
@@ -60,7 +64,7 @@ func (k Keeper) GetAllAccounts(ctx sdk.Context) (accounts []types.Account) {
 // callback, iteration is halted.
 func (k Keeper) IterateAllAccounts(ctx sdk.Context, cb func(types.Account) bool) {
 	store := ctx.KVStore(k.storeKey)
-	iterator := sdk.KVStorePrefixIterator(store, types.AccountStoreKeyPrefix)
+	iterator := storetypes.KVStorePrefixIterator(store, types.AccountStoreKeyPrefix)
 
 	defer iterator.Close()
 	for ; iterator.Valid(); iterator.Next() {
@@ -75,8 +79,8 @@ func (k Keeper) IterateAllAccounts(ctx sdk.Context, cb func(types.Account) bool)
 }
 
 // GetAccount returns the account for a given address.
-func (k Keeper) GetAccount(ctx sdk.Context, addr sdk.AccAddress) *types.Account {
-	store := ctx.KVStore(k.storeKey)
+func (k Keeper) GetAccount(ctx context.Context, addr sdk.AccAddress) *types.Account {
+	store := sdk.UnwrapSDKContext(ctx).KVStore(k.storeKey)
 	var account types.Account
 	bz := store.Get(types.AccountStoreKey(addr))
 	if bz == nil {
@@ -89,11 +93,11 @@ func (k Keeper) GetAccount(ctx sdk.Context, addr sdk.AccAddress) *types.Account 
 }
 
 // SetAccount sets the account for a given address.
-func (k Keeper) SetAccount(ctx sdk.Context, account types.Account) error {
+func (k Keeper) SetAccount(ctx context.Context, account types.Account) error {
 	if err := account.Validate(); err != nil {
 		return err
 	}
-	store := ctx.KVStore(k.storeKey)
+	store := sdk.UnwrapSDKContext(ctx).KVStore(k.storeKey)
 	accountKey := types.AccountStoreKey(account.Address)
 
 	// make sure we remove accounts with zero balance
@@ -113,16 +117,16 @@ func (k Keeper) SetAccount(ctx sdk.Context, account types.Account) error {
 }
 
 // GetBalance returns the total balance of akava for a given account by address.
-func (k Keeper) GetBalance(ctx sdk.Context, addr sdk.AccAddress) sdk.Int {
+func (k Keeper) GetBalance(ctx context.Context, addr sdk.AccAddress) sdkmath.Int {
 	account := k.GetAccount(ctx, addr)
 	if account == nil {
-		return sdk.ZeroInt()
+		return sdkmath.ZeroInt()
 	}
 	return account.Balance
 }
 
 // SetBalance sets the total balance of akava for a given account by address.
-func (k Keeper) SetBalance(ctx sdk.Context, addr sdk.AccAddress, bal sdk.Int) error {
+func (k Keeper) SetBalance(ctx context.Context, addr sdk.AccAddress, bal sdkmath.Int) error {
 	account := k.GetAccount(ctx, addr)
 	if account == nil {
 		account = types.NewAccount(addr, bal)
@@ -138,7 +142,7 @@ func (k Keeper) SetBalance(ctx sdk.Context, addr sdk.AccAddress, bal sdk.Int) er
 }
 
 // SendBalance transfers the akava balance from sender addr to recipient addr.
-func (k Keeper) SendBalance(ctx sdk.Context, senderAddr sdk.AccAddress, recipientAddr sdk.AccAddress, amt sdk.Int) error {
+func (k Keeper) SendBalance(ctx context.Context, senderAddr sdk.AccAddress, recipientAddr sdk.AccAddress, amt sdkmath.Int) error {
 	if amt.IsNegative() {
 		return fmt.Errorf("cannot send a negative amount of akava: %d", amt)
 	}
@@ -149,7 +153,7 @@ func (k Keeper) SendBalance(ctx sdk.Context, senderAddr sdk.AccAddress, recipien
 
 	senderBal := k.GetBalance(ctx, senderAddr)
 	if senderBal.LT(amt) {
-		return sdkerrors.Wrapf(sdkerrors.ErrInsufficientFunds, "insufficient funds to send %s", amt.String())
+		return errorsmod.Wrapf(sdkerrors.ErrInsufficientFunds, "insufficient funds to send %s", amt.String())
 	}
 	if err := k.SetBalance(ctx, senderAddr, senderBal.Sub(amt)); err != nil {
 		return err
@@ -160,13 +164,13 @@ func (k Keeper) SendBalance(ctx sdk.Context, senderAddr sdk.AccAddress, recipien
 }
 
 // AddBalance increments the akava balance of an address.
-func (k Keeper) AddBalance(ctx sdk.Context, addr sdk.AccAddress, amt sdk.Int) error {
+func (k Keeper) AddBalance(ctx context.Context, addr sdk.AccAddress, amt sdkmath.Int) error {
 	bal := k.GetBalance(ctx, addr)
 	return k.SetBalance(ctx, addr, amt.Add(bal))
 }
 
 // RemoveBalance decrements the akava balance of an address.
-func (k Keeper) RemoveBalance(ctx sdk.Context, addr sdk.AccAddress, amt sdk.Int) error {
+func (k Keeper) RemoveBalance(ctx context.Context, addr sdk.AccAddress, amt sdkmath.Int) error {
 	if amt.IsNegative() {
 		return fmt.Errorf("cannot remove a negative amount from balance: %d", amt)
 	}
@@ -176,7 +180,7 @@ func (k Keeper) RemoveBalance(ctx sdk.Context, addr sdk.AccAddress, amt sdk.Int)
 	bal := k.GetBalance(ctx, addr)
 	finalBal := bal.Sub(amt)
 	if finalBal.IsNegative() {
-		return sdkerrors.Wrapf(sdkerrors.ErrInsufficientFunds, "insufficient funds to send %s", amt.String())
+		return errorsmod.Wrapf(sdkerrors.ErrInsufficientFunds, "insufficient funds to send %s", amt.String())
 	}
 	return k.SetBalance(ctx, addr, finalBal)
 }

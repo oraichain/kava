@@ -3,8 +3,8 @@ package cli
 import (
 	"fmt"
 
+	sdkmath "cosmossdk.io/math"
 	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/spf13/cobra"
 
 	"github.com/cosmos/cosmos-sdk/client"
@@ -102,7 +102,7 @@ func getCmdConvertERC20ToCoin() *cobra.Command {
 				return err
 			}
 
-			amount, ok := sdk.NewIntFromString(args[2])
+			amount, ok := sdkmath.NewIntFromString(args[2])
 			if !ok {
 				return fmt.Errorf("amount '%s' is invalid", args[2])
 			}

@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"time"
 
+	sdkmath "cosmossdk.io/math"
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/cometbft/cometbft/crypto/tmhash"
 	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
@@ -33,11 +34,10 @@ import (
 	etherminttypes "github.com/evmos/ethermint/types"
 	evmtypes "github.com/evmos/ethermint/x/evm/types"
 	feemarkettypes "github.com/evmos/ethermint/x/feemarket/types"
-	"github.com/stretchr/testify/suite"
-
 	"github.com/kava-labs/kava/app"
 	"github.com/kava-labs/kava/x/evmutil/keeper"
 	"github.com/kava-labs/kava/x/evmutil/types"
+	"github.com/stretchr/testify/suite"
 )
 
 type Suite struct {
@@ -62,7 +62,7 @@ type Suite struct {
 func (suite *Suite) SetupTest() {
 	tApp := app.NewTestApp()
 
-	suite.Ctx = tApp.NewContext(true, tmproto.Header{Height: 1, Time: tmtime.Now()})
+	suite.Ctx = tApp.NewContextLegacy(true, tmproto.Header{Height: 1, Time: tmtime.Now()})
 	suite.App = tApp
 	suite.BankKeeper = tApp.GetBankKeeper()
 	suite.AccountKeeper = tApp.GetAccountKeeper()
@@ -107,7 +107,7 @@ func (suite *Suite) SetupTest() {
 	consAddress := sdk.ConsAddress(consPriv.PubKey().Address())
 
 	// InitializeFromGenesisStates commits first block so we start at 2 here
-	suite.Ctx = suite.App.NewContext(false, tmproto.Header{
+	suite.Ctx = suite.App.NewContextLegacy(false, tmproto.Header{
 		Height:          suite.App.LastBlockHeight() + 1,
 		ChainID:         "kavatest_1-1",
 		Time:            time.Now().UTC(),
@@ -140,7 +140,7 @@ func (suite *Suite) SetupTest() {
 	}
 	suite.AccountKeeper.SetAccount(suite.Ctx, acc)
 	valAddr := sdk.ValAddress(suite.Address.Bytes())
-	validator, err := stakingtypes.NewValidator(valAddr, consPriv.PubKey(), stakingtypes.Description{})
+	validator, err := stakingtypes.NewValidator(valAddr.String(), consPriv.PubKey(), stakingtypes.Description{})
 	suite.Require().NoError(err)
 	err = suite.App.GetStakingKeeper().SetValidatorByConsAddr(suite.Ctx, validator)
 	suite.Require().NoError(err)
@@ -169,15 +169,15 @@ func (suite *Suite) SetupTest() {
 }
 
 func (suite *Suite) Commit() {
-	_ = suite.App.Commit()
+	_, _ = suite.App.Commit()
 	header := suite.Ctx.BlockHeader()
 	header.Height += 1
-	suite.App.BeginBlock(abci.RequestBeginBlock{
-		Header: header,
+	suite.App.FinalizeBlock(&abci.RequestFinalizeBlock{
+		Height: header.Height,
 	})
 
 	// update ctx
-	suite.Ctx = suite.App.NewContext(false, header)
+	suite.Ctx = suite.App.NewContextLegacy(false, header)
 }
 
 func (suite *Suite) FundAccountWithKava(addr sdk.AccAddress, coins sdk.Coins) {
@@ -213,7 +213,7 @@ func (suite *Suite) DeployERC20() types.InternalEVMAddress {
 	suite.App.FundModuleAccount(
 		suite.Ctx,
 		types.ModuleName,
-		sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(0))),
+		sdk.NewCoins(sdk.NewCoin("ukava", sdkmath.NewInt(0))),
 	)
 
 	contractAddr, err := suite.Keeper.DeployTestMintableERC20Contract(suite.Ctx, "USDC", "USDC", uint8(18))
@@ -315,7 +315,7 @@ func (suite *Suite) SendTx(
 	suite.MintFeeCollector(sdk.NewCoins(
 		sdk.NewCoin(
 			"ukava",
-			sdk.NewInt(baseFee.Int64()*int64(gasRes.Gas*2)),
+			sdkmath.NewInt(baseFee.Int64()*int64(gasRes.Gas*2)),
 		)))
 
 	ercTransferTx := evmtypes.NewTx(

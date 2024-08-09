@@ -93,12 +93,12 @@ func (th TallyHandler) Tally(ctx sdk.Context, proposal types.Proposal) (passes b
 }
 
 // bkavaByDenom a map of the bkava denom and the amount of bkava for that denom.
-type bkavaByDenom map[string]sdk.Int
+type bkavaByDenom map[string]sdkmath.Int
 
 func (bkavaMap bkavaByDenom) add(coin sdk.Coin) {
 	_, found := bkavaMap[coin.Denom]
 	if !found {
-		bkavaMap[coin.Denom] = sdk.ZeroInt()
+		bkavaMap[coin.Denom] = sdkmath.ZeroInt()
 	}
 	bkavaMap[coin.Denom] = bkavaMap[coin.Denom].Add(coin.Amount)
 }
