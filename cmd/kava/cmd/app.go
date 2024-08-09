@@ -9,8 +9,10 @@ import (
 
 	"cosmossdk.io/store"
 	"cosmossdk.io/store/snapshots"
+	storetypes "cosmossdk.io/store/types"
 	db "github.com/cometbft/cometbft-db"
 	"github.com/cometbft/cometbft/libs/log"
+	dbm "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/server"
@@ -43,7 +45,7 @@ func (ac appCreator) newApp(
 	traceStore io.Writer,
 	appOpts servertypes.AppOptions,
 ) servertypes.Application {
-	var cache sdk.MultiStorePersistentCache
+	var cache storetypes.MultiStorePersistentCache
 	if cast.ToBool(appOpts.Get(server.FlagInterBlockCache)) {
 		cache = store.NewCommitKVStoreCacheManager()
 	}
@@ -60,7 +62,7 @@ func (ac appCreator) newApp(
 
 	homeDir := cast.ToString(appOpts.Get(flags.FlagHome))
 	snapshotDir := filepath.Join(homeDir, "data", "snapshots") // TODO can these directory names be imported from somewhere?
-	snapshotDB, err := sdk.NewLevelDB("metadata", snapshotDir)
+	snapshotDB, err := dbm.NewGoLevelDB("metadata", snapshotDir, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -77,10 +79,7 @@ func (ac appCreator) newApp(
 		panic(fmt.Sprintf("could not get authorized address from config: %v", err))
 	}
 
-	iavlDisableFastNode := appOpts.Get(server.FlagIAVLFastNode)
-	if iavlDisableFastNode == nil {
-		iavlDisableFastNode = true
-	}
+	iavlDisableFastNode := true
 
 	return app.NewApp(
 		logger, db, homeDir, traceStore, ac.encodingConfig,
