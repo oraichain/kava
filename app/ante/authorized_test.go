@@ -3,7 +3,7 @@ package ante_test
 import (
 	"testing"
 
-	"github.com/cosmos/cosmos-sdk/simapp/helpers"
+	helpers "github.com/cosmos/cosmos-sdk/testutil/sims"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/stretchr/testify/require"

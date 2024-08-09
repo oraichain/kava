@@ -11,21 +11,21 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/kava-labs/kava/app"
 
+	tmbytes "github.com/cometbft/cometbft/libs/bytes"
+	rpchttp "github.com/cometbft/cometbft/rpc/client/http"
+	ctypes "github.com/cometbft/cometbft/rpc/core/types"
+	jsonrpctypes "github.com/cometbft/cometbft/rpc/jsonrpc/types"
+	tmtypes "github.com/cometbft/cometbft/types"
 	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/tests/mocks"
+
 	"github.com/cosmos/cosmos-sdk/testutil/testdata"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth/legacy/legacytx"
+	"github.com/cosmos/cosmos-sdk/x/auth/migrations/legacytx"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	tmbytes "github.com/tendermint/tendermint/libs/bytes"
-	rpchttp "github.com/tendermint/tendermint/rpc/client/http"
-	ctypes "github.com/tendermint/tendermint/rpc/core/types"
-	jsonrpctypes "github.com/tendermint/tendermint/rpc/jsonrpc/types"
-	tmtypes "github.com/tendermint/tendermint/types"
 )
 
 type LegacyTxBroadcastTestSuite struct {
@@ -34,7 +34,7 @@ type LegacyTxBroadcastTestSuite struct {
 	restServer       *httptest.Server
 	rpcServer        *httptest.Server
 	ctrl             *gomock.Controller
-	accountRetriever *mocks.MockAccountRetriever
+	accountRetriever *client.MockAccountRetriever
 	simulateResponse func(jsonrpctypes.RPCRequest) jsonrpctypes.RPCResponse
 }
 
@@ -51,7 +51,7 @@ func (suite *LegacyTxBroadcastTestSuite) SetupTest() {
 	rpcClient, err := rpchttp.New(suite.rpcServer.URL, "/websocket")
 	suite.Require().NoError(err)
 	suite.ctrl = gomock.NewController(suite.T())
-	suite.accountRetriever = mocks.NewMockAccountRetriever(suite.ctrl)
+	suite.accountRetriever = client.MockAccountRetriever{}
 	encodingConfig := app.MakeEncodingConfig()
 	suite.clientCtx = client.Context{}.
 		WithCodec(encodingConfig.Marshaler).

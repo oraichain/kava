@@ -10,18 +10,18 @@ import (
 
 	"github.com/kava-labs/kava/app"
 
+	abci "github.com/cometbft/cometbft/abci/types"
+	tmbytes "github.com/cometbft/cometbft/libs/bytes"
+	ctypes "github.com/cometbft/cometbft/rpc/core/types"
+	jsonrpctypes "github.com/cometbft/cometbft/rpc/jsonrpc/types"
 	"github.com/cosmos/cosmos-sdk/client/context"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/types/rest"
+
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/cosmos/cosmos-sdk/x/bank"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	abci "github.com/tendermint/tendermint/abci/types"
-	tmbytes "github.com/tendermint/tendermint/libs/bytes"
-	ctypes "github.com/tendermint/tendermint/rpc/core/types"
-	jsonrpctypes "github.com/tendermint/tendermint/rpc/jsonrpc/types"
 )
 
 type SimulateRequestTestSuite struct {
@@ -132,12 +132,6 @@ func (suite *SimulateRequestTestSuite) TestSimulateRequest() {
 
 	body, err := ioutil.ReadAll(resp.Body)
 	suite.Require().NoError(err)
-
-	var respWithHeight rest.ResponseWithHeight
-	err = suite.cliCtx.Codec.UnmarshalJSON(body, &respWithHeight)
-	suite.Require().NoError(err)
-
-	suite.Equal(int64(100000), respWithHeight.Height)
 
 	var simResp sdk.SimulationResponse
 	err = suite.cliCtx.Codec.UnmarshalJSON(respWithHeight.Result, &simResp)

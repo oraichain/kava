@@ -1,22 +1,16 @@
 package app
 
 import (
-	"fmt"
-
+	storetypes "cosmossdk.io/store/types"
+	upgradetypes "cosmossdk.io/x/upgrade/types"
+	dbm "github.com/cometbft/cometbft-db"
 	"github.com/cosmos/cosmos-sdk/baseapp"
-	storetypes "github.com/cosmos/cosmos-sdk/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
-	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
 	distrkeeper "github.com/cosmos/cosmos-sdk/x/distribution/keeper"
 	mintkeeper "github.com/cosmos/cosmos-sdk/x/mint/keeper"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
-	upgradetypes "github.com/cosmos/cosmos-sdk/x/upgrade/types"
-	dbm "github.com/tendermint/tm-db"
-
-	communitykeeper "github.com/kava-labs/kava/x/community/keeper"
-	communitytypes "github.com/kava-labs/kava/x/community/types"
 )
 
 const (
@@ -112,7 +106,6 @@ func TestnetUpgradeHandler(app App) upgradetypes.UpgradeHandler {
 
 		// move community pool funds back to community pool from community module.
 		app.Logger().Info("migrating community pool funds")
-		MigrateCommunityPoolFunds(ctx, app.accountKeeper, app.communityKeeper, app.distrKeeper)
 
 		// reenable community tax
 		app.Logger().Info("re-enabling community tax")
@@ -132,27 +125,6 @@ func TestnetUpgradeHandler(app App) upgradetypes.UpgradeHandler {
 		InitializeMintState(ctx, app.mintKeeper, app.stakingKeeper)
 
 		return vm, nil
-	}
-}
-
-// MigrateCommunityPoolFunds takes the full balance of the x/community module account and transfers them
-// back to the original community pool (the auth fee pool)
-// In the v0.20.0-alpha.0 upgrade handler, community pool funds were moved to the x/community module
-// account. This handler transfers them back.
-func MigrateCommunityPoolFunds(
-	ctx sdk.Context,
-	accountKeeper authkeeper.AccountKeeper,
-	communityKeeper communitykeeper.Keeper,
-	distKeeper distrkeeper.Keeper,
-) {
-	// get total balance of x/community module account
-	balance := communityKeeper.GetModuleAccountBalance(ctx)
-
-	// transfer whole balance to the community pool (auth fee pool held by x/distribution)
-	communityMaccAddress := accountKeeper.GetModuleAddress(communitytypes.ModuleAccountName)
-	err := distKeeper.FundCommunityPool(ctx, balance, communityMaccAddress)
-	if err != nil {
-		panic(fmt.Sprintf("failed to move community pool funds: %s", err))
 	}
 }
 

@@ -3,17 +3,17 @@ package client
 import (
 	"bufio"
 
+	"github.com/cometbft/cometbft/libs/cli"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/client/keys"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/spf13/cobra"
-	"github.com/tendermint/tendermint/libs/cli"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
-	ethclient "github.com/tharsis/ethermint/client"
-	clientkeys "github.com/tharsis/ethermint/client/keys"
-	"github.com/tharsis/ethermint/crypto/hd"
+	ethclient "github.com/evmos/ethermint/client"
+	clientkeys "github.com/evmos/ethermint/client/keys"
+	"github.com/evmos/ethermint/crypto/hd"
 )
 
 var ethFlag = "eth"

@@ -6,6 +6,10 @@ import (
 	"testing"
 	"time"
 
+	tmdb "github.com/cometbft/cometbft-db"
+	abci "github.com/cometbft/cometbft/abci/types"
+	"github.com/cometbft/cometbft/libs/log"
+	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
@@ -24,30 +28,12 @@ import (
 	slashingkeeper "github.com/cosmos/cosmos-sdk/x/slashing/keeper"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	"github.com/stretchr/testify/require"
-	abci "github.com/tendermint/tendermint/abci/types"
-	"github.com/tendermint/tendermint/libs/log"
-	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
-	tmdb "github.com/tendermint/tm-db"
-	evmkeeper "github.com/tharsis/ethermint/x/evm/keeper"
-	feemarketkeeper "github.com/tharsis/ethermint/x/feemarket/keeper"
+	evmkeeper "github.com/evmos/ethermint/x/evm/keeper"
+	feemarketkeeper "github.com/evmos/ethermint/x/feemarket/keeper"
 
-	auctionkeeper "github.com/kava-labs/kava/x/auction/keeper"
-	bep3keeper "github.com/kava-labs/kava/x/bep3/keeper"
-	cdpkeeper "github.com/kava-labs/kava/x/cdp/keeper"
-	committeekeeper "github.com/kava-labs/kava/x/committee/keeper"
-	communitykeeper "github.com/kava-labs/kava/x/community/keeper"
-	earnkeeper "github.com/kava-labs/kava/x/earn/keeper"
 	evmutilkeeper "github.com/kava-labs/kava/x/evmutil/keeper"
-	hardkeeper "github.com/kava-labs/kava/x/hard/keeper"
-	incentivekeeper "github.com/kava-labs/kava/x/incentive/keeper"
-	issuancekeeper "github.com/kava-labs/kava/x/issuance/keeper"
-	kavadistkeeper "github.com/kava-labs/kava/x/kavadist/keeper"
-	liquidkeeper "github.com/kava-labs/kava/x/liquid/keeper"
-	pricefeedkeeper "github.com/kava-labs/kava/x/pricefeed/keeper"
-	routerkeeper "github.com/kava-labs/kava/x/router/keeper"
-	savingskeeper "github.com/kava-labs/kava/x/savings/keeper"
-	swapkeeper "github.com/kava-labs/kava/x/swap/keeper"
+
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -59,13 +45,16 @@ var (
 // TestApp is a simple wrapper around an App. It exposes internal keepers for use in integration tests.
 // This file also contains test helpers. Ideally they would be in separate package.
 // Basic Usage:
-// 	Create a test app with NewTestApp, then all keepers and their methods can be accessed for test setup and execution.
+//
+//	Create a test app with NewTestApp, then all keepers and their methods can be accessed for test setup and execution.
+//
 // Advanced Usage:
-// 	Some tests call for an app to be initialized with some state. This can be achieved through keeper method calls (ie keeper.SetParams(...)).
-// 	However this leads to a lot of duplicated logic similar to InitGenesis methods.
-// 	So TestApp.InitializeFromGenesisStates() will call InitGenesis with the default genesis state.
+//
+//	Some tests call for an app to be initialized with some state. This can be achieved through keeper method calls (ie keeper.SetParams(...)).
+//	However this leads to a lot of duplicated logic similar to InitGenesis methods.
+//	So TestApp.InitializeFromGenesisStates() will call InitGenesis with the default genesis state.
 //	and TestApp.InitializeFromGenesisStates(authState, cdpState) will do the same but overwrite the auth and cdp sections of the default genesis state
-// 	Creating the genesis states can be combersome, but helper methods can make it easier such as NewAuthGenStateFromAccounts below.
+//	Creating the genesis states can be combersome, but helper methods can make it easier such as NewAuthGenStateFromAccounts below.
 type TestApp struct {
 	App
 }
@@ -100,24 +89,10 @@ func (tApp TestApp) GetGovKeeper() govkeeper.Keeper             { return tApp.go
 func (tApp TestApp) GetCrisisKeeper() crisiskeeper.Keeper       { return tApp.crisisKeeper }
 func (tApp TestApp) GetParamsKeeper() paramskeeper.Keeper       { return tApp.paramsKeeper }
 
-func (tApp TestApp) GetKavadistKeeper() kavadistkeeper.Keeper   { return tApp.kavadistKeeper }
-func (tApp TestApp) GetAuctionKeeper() auctionkeeper.Keeper     { return tApp.auctionKeeper }
-func (tApp TestApp) GetIssuanceKeeper() issuancekeeper.Keeper   { return tApp.issuanceKeeper }
-func (tApp TestApp) GetBep3Keeper() bep3keeper.Keeper           { return tApp.bep3Keeper }
-func (tApp TestApp) GetPriceFeedKeeper() pricefeedkeeper.Keeper { return tApp.pricefeedKeeper }
-func (tApp TestApp) GetSwapKeeper() swapkeeper.Keeper           { return tApp.swapKeeper }
-func (tApp TestApp) GetCDPKeeper() cdpkeeper.Keeper             { return tApp.cdpKeeper }
-func (tApp TestApp) GetHardKeeper() hardkeeper.Keeper           { return tApp.hardKeeper }
-func (tApp TestApp) GetCommitteeKeeper() committeekeeper.Keeper { return tApp.committeeKeeper }
-func (tApp TestApp) GetIncentiveKeeper() incentivekeeper.Keeper { return tApp.incentiveKeeper }
-func (tApp TestApp) GetEvmutilKeeper() evmutilkeeper.Keeper     { return tApp.evmutilKeeper }
-func (tApp TestApp) GetEvmKeeper() *evmkeeper.Keeper            { return tApp.evmKeeper }
-func (tApp TestApp) GetSavingsKeeper() savingskeeper.Keeper     { return tApp.savingsKeeper }
+func (tApp TestApp) GetEvmutilKeeper() evmutilkeeper.Keeper { return tApp.evmutilKeeper }
+func (tApp TestApp) GetEvmKeeper() *evmkeeper.Keeper        { return tApp.evmKeeper }
+
 func (tApp TestApp) GetFeeMarketKeeper() feemarketkeeper.Keeper { return tApp.feeMarketKeeper }
-func (tApp TestApp) GetLiquidKeeper() liquidkeeper.Keeper       { return tApp.liquidKeeper }
-func (tApp TestApp) GetEarnKeeper() earnkeeper.Keeper           { return tApp.earnKeeper }
-func (tApp TestApp) GetRouterKeeper() routerkeeper.Keeper       { return tApp.routerKeeper }
-func (tApp TestApp) GetCommunityKeeper() communitykeeper.Keeper { return tApp.communityKeeper }
 
 // LegacyAmino returns the app's amino codec.
 func (app *App) LegacyAmino() *codec.LegacyAmino {
