@@ -605,8 +605,11 @@ func NewApp(
 	app.mm.RegisterInvariants(app.crisisKeeper)
 	// app.mm.RegisterRoutes(app.Router(), app.QueryRouter(), encodingConfig.Amino)
 
-	// app.configurator = module.NewConfigurator(app.appCodec, app.MsgServiceRouter(), app.GRPCQueryRouter())
-	app.RegisterServices(app.configurator)
+	app.configurator = module.NewConfigurator(app.appCodec, app.MsgServiceRouter(), app.GRPCQueryRouter())
+	err := app.RegisterServices(app.configurator)
+	if err != nil {
+		panic(err)
+	}
 
 	// RegisterUpgradeHandlers is used for registering any on-chain upgrades.
 	// It needs to be called after `app.mm` and `app.configurator` are set.
@@ -681,8 +684,8 @@ func NewApp(
 	return app
 }
 
-func (app *App) RegisterServices(cfg module.Configurator) {
-	app.mm.RegisterServices(cfg)
+func (app *App) RegisterServices(cfg module.Configurator) error {
+	return app.mm.RegisterServices(cfg)
 }
 
 // BeginBlocker application updates every begin block
@@ -704,7 +707,10 @@ func (app *App) InitChainer(ctx sdk.Context, req *abci.RequestInitChain) (*abci.
 
 	// Store current module versions in kava-10 to setup future in-place upgrades.
 	// During in-place migrations, the old module versions in the store will be referenced to determine which migrations to run.
-	app.upgradeKeeper.SetModuleVersionMap(ctx, app.mm.GetVersionMap())
+	err := app.upgradeKeeper.SetModuleVersionMap(ctx, app.mm.GetVersionMap())
+	if err != nil {
+		panic(err)
+	}
 
 	return app.mm.InitGenesis(ctx, app.appCodec, genesisState)
 }

@@ -10,6 +10,7 @@ import (
 	abci "github.com/cometbft/cometbft/abci/types"
 	tmtypes "github.com/cometbft/cometbft/types"
 	db "github.com/cosmos/cosmos-db"
+	"github.com/cosmos/cosmos-sdk/baseapp"
 	simtestutil "github.com/cosmos/cosmos-sdk/testutil/sims"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,20 +31,22 @@ func TestNewApp(t *testing.T) {
 func TestExport(t *testing.T) {
 	SetSDKConfig()
 	db := db.NewMemDB()
-	app := NewApp(log.NewTestLogger(t), db, DefaultNodeHome, nil, MakeEncodingConfig(), DefaultOptions)
+	app := NewApp(log.NewTestLogger(t), db, DefaultNodeHome, nil, MakeEncodingConfig(), DefaultOptions, baseapp.SetChainID(testChainID))
 
 	stateBytes, err := json.Marshal(NewDefaultGenesisState())
 	require.NoError(t, err)
 
 	initRequest := &abci.RequestInitChain{
 		Time:            time.Date(1998, 1, 1, 0, 0, 0, 0, time.UTC),
-		ChainId:         "kavatest_1-1",
+		ChainId:         testChainID,
 		InitialHeight:   1,
 		ConsensusParams: simtestutil.DefaultConsensusParams,
 		Validators:      nil,
 		AppStateBytes:   stateBytes,
 	}
-	app.InitChain(initRequest)
+	_, err = app.InitChain(initRequest)
+	require.NoError(t, err)
+
 	app.Commit()
 
 	exportedApp, err := app.ExportAppStateAndValidators(false, []string{})
