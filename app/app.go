@@ -1,11 +1,13 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	stdlog "log"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"cosmossdk.io/log"
 	storetypes "cosmossdk.io/store/types"
@@ -31,10 +33,12 @@ import (
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
+	"github.com/cosmos/cosmos-sdk/types/msgservice"
 	"github.com/cosmos/cosmos-sdk/version"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	authcodec "github.com/cosmos/cosmos-sdk/x/auth/codec"
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
+	"github.com/cosmos/cosmos-sdk/x/auth/posthandler"
 	authsims "github.com/cosmos/cosmos-sdk/x/auth/simulation"
 	authtx "github.com/cosmos/cosmos-sdk/x/auth/tx"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -46,6 +50,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/bank"
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	"github.com/cosmos/gogoproto/proto"
 	"github.com/cosmos/ibc-go/modules/capability"
 	capabilitykeeper "github.com/cosmos/ibc-go/modules/capability/keeper"
 	capabilitytypes "github.com/cosmos/ibc-go/modules/capability/types"
@@ -113,37 +118,6 @@ const (
 var (
 	// DefaultNodeHome default home directories for the application daemon
 	DefaultNodeHome string
-
-	// ModuleBasics manages simple versions of full app modules.
-	// It's used for things such as codec registration and genesis file verification.
-	ModuleBasics = module.NewBasicManager(
-		genutil.AppModuleBasic{},
-		auth.AppModuleBasic{},
-		bank.AppModuleBasic{},
-		capability.AppModuleBasic{},
-		staking.AppModuleBasic{},
-		distr.AppModuleBasic{},
-		gov.NewAppModuleBasic(
-			[]govclient.ProposalHandler{
-				paramsclient.ProposalHandler,
-			},
-		),
-		params.AppModuleBasic{},
-		crisis.AppModuleBasic{},
-		slashing.AppModuleBasic{},
-		ibc.AppModuleBasic{},
-		upgrade.AppModuleBasic{},
-		evidence.AppModuleBasic{},
-		authzmodule.AppModuleBasic{},
-		transfer.AppModuleBasic{},
-		vesting.AppModuleBasic{},
-		evm.AppModuleBasic{},
-		feemarket.AppModuleBasic{},
-
-		evmutil.AppModuleBasic{},
-
-		mint.AppModuleBasic{},
-	)
 
 	// module account permissions
 	// If these are changed, the permissions stored in accounts
@@ -224,7 +198,8 @@ type App struct {
 	ScopedTransferKeeper capabilitykeeper.ScopedKeeper
 
 	// the module manager
-	mm *module.Manager
+	mm                 *module.Manager
+	BasicModuleManager module.BasicManager
 
 	// simulation manager
 	sm *module.SimulationManager
@@ -262,12 +237,14 @@ func NewApp(
 	bApp.SetInterfaceRegistry(interfaceRegistry)
 
 	keys := storetypes.NewKVStoreKeys(
-		authtypes.StoreKey, banktypes.StoreKey, stakingtypes.StoreKey,
-		distrtypes.StoreKey, slashingtypes.StoreKey,
-		govtypes.StoreKey, paramstypes.StoreKey, ibcexported.StoreKey,
-		upgradetypes.StoreKey, evidencetypes.StoreKey, ibctransfertypes.StoreKey,
-		evmtypes.StoreKey, feemarkettypes.StoreKey, authzkeeper.StoreKey,
-		capabilitytypes.StoreKey, evmutiltypes.StoreKey, minttypes.StoreKey,
+		authtypes.StoreKey, banktypes.StoreKey, stakingtypes.StoreKey, crisistypes.StoreKey,
+		minttypes.StoreKey, distrtypes.StoreKey, slashingtypes.StoreKey,
+		govtypes.StoreKey, paramstypes.StoreKey, consensusparamtypes.StoreKey, upgradetypes.StoreKey,
+		evidencetypes.StoreKey,
+		authzkeeper.StoreKey,
+		// non sdk store keys
+		capabilitytypes.StoreKey, ibcexported.StoreKey, ibctransfertypes.StoreKey,
+		evmtypes.StoreKey, feemarkettypes.StoreKey, evmutiltypes.StoreKey,
 	)
 	tkeys := storetypes.NewTransientStoreKeys(paramstypes.TStoreKey, evmtypes.TransientKey, feemarkettypes.TransientKey)
 	memKeys := storetypes.NewMemoryStoreKeys(capabilitytypes.MemStoreKey)
@@ -290,6 +267,7 @@ func NewApp(
 		tkeys[paramstypes.TStoreKey],
 	)
 
+	mintSubspace := app.paramsKeeper.Subspace(minttypes.ModuleName)
 	slashingSubspace := app.paramsKeeper.Subspace(slashingtypes.ModuleName)
 	crisisSubspace := app.paramsKeeper.Subspace(crisistypes.ModuleName)
 	govSubspace := app.paramsKeeper.Subspace(govtypes.ModuleName)
@@ -301,7 +279,6 @@ func NewApp(
 	ibctransferSubspace := app.paramsKeeper.Subspace(ibctransfertypes.ModuleName)
 	feemarketSubspace := app.paramsKeeper.Subspace(feemarkettypes.ModuleName)
 	evmSubspace := app.paramsKeeper.Subspace(evmtypes.ModuleName)
-	mintSubspace := app.paramsKeeper.Subspace(minttypes.ModuleName)
 	evmutilSubspace := app.paramsKeeper.Subspace(evmutiltypes.ModuleName)
 
 	// set the BaseApp's parameter store
@@ -486,6 +463,7 @@ func NewApp(
 		genutil.NewAppModule(app.accountKeeper, app.stakingKeeper, app, encodingConfig.TxConfig),
 		auth.NewAppModule(appCodec, app.accountKeeper, authsims.RandomGenesisAccounts, authSubspace),
 		bank.NewAppModule(appCodec, app.bankKeeper, app.accountKeeper, bankSubspace),
+		mint.NewAppModule(appCodec, app.mintKeeper, app.accountKeeper, nil, mintSubspace),
 		capability.NewAppModule(appCodec, *app.capabilityKeeper, false),
 		staking.NewAppModule(appCodec, app.stakingKeeper, app.accountKeeper, app.bankKeeper, stakingSubspace),
 		distr.NewAppModule(appCodec, app.distrKeeper, app.accountKeeper, app.bankKeeper, app.stakingKeeper, distrSubspace),
@@ -502,7 +480,29 @@ func NewApp(
 		vesting.NewAppModule(app.accountKeeper, app.bankKeeper),
 		authzmodule.NewAppModule(appCodec, app.authzKeeper, app.accountKeeper, app.bankKeeper, app.interfaceRegistry),
 		evmutil.NewAppModule(app.evmutilKeeper, app.bankKeeper),
-		mint.NewAppModule(appCodec, app.mintKeeper, app.accountKeeper, nil, mintSubspace),
+	)
+
+	// BasicModuleManager defines the module BasicManager is in charge of setting up basic,
+	// non-dependant module elements, such as codec registration and genesis verification.
+	// By default it is composed of all the module from the module manager.
+	// Additionally, app module basics can be overwritten by passing them as argument.
+
+	app.BasicModuleManager = module.NewBasicManagerFromManager(
+		app.mm,
+		map[string]module.AppModuleBasic{
+			genutiltypes.ModuleName: genutil.NewAppModuleBasic(genutiltypes.DefaultMessageValidator),
+			govtypes.ModuleName: gov.NewAppModuleBasic(
+				[]govclient.ProposalHandler{
+					paramsclient.ProposalHandler,
+				},
+			),
+		})
+	app.BasicModuleManager.RegisterLegacyAminoCodec(legacyAmino)
+	app.BasicModuleManager.RegisterInterfaces(interfaceRegistry)
+
+	// NOTE: upgrade module is required to be prioritized
+	app.mm.SetOrderPreBlockers(
+		upgradetypes.ModuleName,
 	)
 
 	// Warning: Some begin blockers must run before others. Ensure the dependencies are understood before modifying this list.
@@ -535,12 +535,13 @@ func NewApp(
 		authtypes.ModuleName,
 		banktypes.ModuleName,
 		govtypes.ModuleName,
-		crisistypes.ModuleName,
 		genutiltypes.ModuleName,
 		ibctransfertypes.ModuleName,
 		paramstypes.ModuleName,
 		authz.ModuleName,
 		evmutiltypes.ModuleName,
+		consensusparamtypes.ModuleName,
+		crisistypes.ModuleName,
 	)
 
 	// Warning: Some end blockers must run before others. Ensure the dependencies are understood before modifying this list.
@@ -548,6 +549,7 @@ func NewApp(
 		crisistypes.ModuleName,
 		govtypes.ModuleName,
 		stakingtypes.ModuleName,
+		minttypes.ModuleName,
 		evmtypes.ModuleName,
 		// fee market module must go after evm module in order to retrieve the block gas used.
 		feemarkettypes.ModuleName,
@@ -571,8 +573,6 @@ func NewApp(
 		paramstypes.ModuleName,
 		authz.ModuleName,
 		evmutiltypes.ModuleName,
-
-		minttypes.ModuleName,
 	)
 
 	// Warning: Some init genesis methods must run before others. Ensure the dependencies are understood before modifying this list
@@ -595,11 +595,11 @@ func NewApp(
 		evmutiltypes.ModuleName,
 
 		genutiltypes.ModuleName, // runs arbitrary txs included in genisis state, so run after modules have been initialized
-		crisistypes.ModuleName,  // runs the invariants at genesis, should run after other modules
 		// Add all remaining modules with an empty InitGenesis below since cosmos 0.45.0 requires it
 		vestingtypes.ModuleName,
 		paramstypes.ModuleName,
 		upgradetypes.ModuleName,
+		crisistypes.ModuleName,  // runs the invariants at genesis, should run after other modules
 	)
 
 	app.mm.RegisterInvariants(app.crisisKeeper)
@@ -633,19 +633,12 @@ func NewApp(
 	// app.sm.RegisterStoreDecoders()
 
 	// initialize stores
-	// app.MountKVStores(keys)
-	// app.MountTransientStores(tkeys)
-	// app.MountMemoryStores(memKeys)
+	app.MountKVStores(keys)
+	app.MountTransientStores(tkeys)
+	app.MountMemoryStores(memKeys)
 
 	// initialize the app
 	var fetchers []ante.AddressFetcher
-	// if options.MempoolEnableAuth {
-	// 	fetchers = append(fetchers,
-	// 		func(sdk.Context) []sdk.AccAddress { return options.MempoolAuthAddresses },
-	// 		app.bep3Keeper.GetAuthorizedAddresses,
-	// 		app.pricefeedKeeper.GetAuthorizedAddresses,
-	// 	)
-	// }
 
 	txConfig := authtx.NewTxConfig(appCodec, authtx.DefaultSignModes)
 
@@ -668,8 +661,27 @@ func NewApp(
 
 	app.SetAnteHandler(antehandler)
 	app.SetInitChainer(app.InitChainer)
+	app.SetPreBlocker(app.PreBlocker)
 	app.SetBeginBlocker(app.BeginBlocker)
 	app.SetEndBlocker(app.EndBlocker)
+
+	// At startup, after all modules have been registered, check that all proto
+	// annotations are correct.
+	protoFiles, err := proto.MergedRegistry()
+	if err != nil {
+		panic(err)
+	}
+	err = msgservice.ValidateProtoAnnotations(protoFiles)
+	if err != nil {
+		// Once we switch to using protoreflect-based antehandlers, we might
+		// want to panic here instead of logging a warning.
+		_, _ = fmt.Fprintln(os.Stderr, err.Error())
+	}
+
+	app.ScopedIBCKeeper = scopedIBCKeeper
+	app.ScopedTransferKeeper = scopedTransferKeeper
+
+	app.setPostHandler()
 
 	// load store
 	if !options.SkipLoadLatest {
@@ -678,14 +690,32 @@ func NewApp(
 		}
 	}
 
-	app.ScopedIBCKeeper = scopedIBCKeeper
-	app.ScopedTransferKeeper = scopedTransferKeeper
-
 	return app
+}
+
+func (app *App) setPostHandler() {
+	postHandler, err := posthandler.NewPostHandler(
+		posthandler.HandlerOptions{},
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	app.SetPostHandler(postHandler)
+}
+
+// DefaultGenesis returns a default genesis from the registered AppModuleBasic's.
+func (a *App) DefaultGenesis() map[string]json.RawMessage {
+	return a.BasicModuleManager.DefaultGenesis(a.appCodec)
 }
 
 func (app *App) RegisterServices(cfg module.Configurator) error {
 	return app.mm.RegisterServices(cfg)
+}
+
+// PreBlocker application updates every pre block
+func (app *App) PreBlocker(ctx sdk.Context, _ *abci.RequestFinalizeBlock) (*sdk.ResponsePreBlock, error) {
+	return app.mm.PreBlock(ctx)
 }
 
 // BeginBlocker application updates every begin block
@@ -752,7 +782,7 @@ func (app *App) RegisterAPIRoutes(apiSvr *api.Server, apiConfig config.APIConfig
 	// Register GRPC Gateway routes
 	cmtservice.RegisterGRPCGatewayRoutes(clientCtx, apiSvr.GRPCGatewayRouter)
 	authtx.RegisterGRPCGatewayRoutes(clientCtx, apiSvr.GRPCGatewayRouter)
-	ModuleBasics.RegisterGRPCGatewayRoutes(clientCtx, apiSvr.GRPCGatewayRouter)
+	app.BasicModuleManager.RegisterGRPCGatewayRoutes(clientCtx, apiSvr.GRPCGatewayRouter)
 
 	// Swagger API configuration is ignored
 }
@@ -797,6 +827,32 @@ func (app *App) loadBlockedMaccAddrs() map[string]bool {
 		}
 	}
 	return modAccAddrs
+}
+
+// GetStoreKeys returns all the stored store keys.
+func (app *App) GetStoreKeys() []storetypes.StoreKey {
+	keys := make([]storetypes.StoreKey, 0, len(app.keys))
+	for _, key := range app.keys {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i].Name() < keys[j].Name()
+	})
+	return keys
+}
+
+// GetTKey returns the TransientStoreKey for the provided store key.
+//
+// NOTE: This is solely to be used for testing purposes.
+func (app *App) GetTKey(storeKey string) *storetypes.TransientStoreKey {
+	return app.tkeys[storeKey]
+}
+
+// GetMemKey returns the MemStoreKey for the provided mem key.
+//
+// NOTE: This is solely used for testing purposes.
+func (app *App) GetMemKey(storeKey string) *storetypes.MemoryStoreKey {
+	return app.memKeys[storeKey]
 }
 
 // GetMaccPerms returns a mapping of the application's module account permissions.

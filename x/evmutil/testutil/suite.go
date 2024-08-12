@@ -21,6 +21,7 @@ import (
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
+	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -48,6 +49,7 @@ type Suite struct {
 	Address        common.Address
 	BankKeeper     bankkeeper.Keeper
 	AccountKeeper  authkeeper.AccountKeeper
+	StakingKeeper  *stakingkeeper.Keeper
 	Keeper         keeper.Keeper
 	EvmBankKeeper  keeper.EvmBankKeeper
 	Addrs          []sdk.AccAddress
@@ -66,6 +68,7 @@ func (suite *Suite) SetupTest() {
 	suite.App = tApp
 	suite.BankKeeper = tApp.GetBankKeeper()
 	suite.AccountKeeper = tApp.GetAccountKeeper()
+	suite.StakingKeeper = tApp.GetStakingKeeper()
 	suite.Keeper = tApp.GetEvmutilKeeper()
 	suite.EvmBankKeeper = keeper.NewEvmBankKeeper(tApp.GetEvmutilKeeper(), suite.BankKeeper, suite.AccountKeeper)
 	suite.EvmModuleAddr = suite.AccountKeeper.GetModuleAddress(evmtypes.ModuleName)
@@ -84,6 +87,8 @@ func (suite *Suite) SetupTest() {
 	evmGenesis := evmtypes.DefaultGenesisState()
 	evmGenesis.Params.EvmDenom = "akava"
 
+	evmutilGenesis := types.DefaultGenesisState()
+
 	feemarketGenesis := feemarkettypes.DefaultGenesisState()
 	feemarketGenesis.Params.EnableHeight = 1
 	feemarketGenesis.Params.NoBaseFee = false
@@ -97,6 +102,7 @@ func (suite *Suite) SetupTest() {
 
 	gs := app.GenesisState{
 		evmtypes.ModuleName:       cdc.MustMarshalJSON(evmGenesis),
+		types.ModuleName:          cdc.MustMarshalJSON(evmutilGenesis),
 		feemarkettypes.ModuleName: cdc.MustMarshalJSON(feemarketGenesis),
 	}
 	suite.App.InitializeFromGenesisStates(authGS, gs)
@@ -105,6 +111,7 @@ func (suite *Suite) SetupTest() {
 	consPriv, err := ethsecp256k1.GenerateKey()
 	suite.Require().NoError(err)
 	consAddress := sdk.ConsAddress(consPriv.PubKey().Address())
+	fmt.Println("cons address: ", consAddress)
 
 	// InitializeFromGenesisStates commits first block so we start at 2 here
 	suite.Ctx = suite.App.NewContextLegacy(false, tmproto.Header{
@@ -135,16 +142,21 @@ func (suite *Suite) SetupTest() {
 	// https://github.com/evmos/ethermint/blob/f21592ebfe74da7590eb42ed926dae970b2a9a3f/x/evm/keeper/state_transition.go#L487
 	// evmkeeper.EVMConfig() will return error "failed to load evm config" if not set
 	acc := &etherminttypes.EthAccount{
-		BaseAccount: authtypes.NewBaseAccount(sdk.AccAddress(suite.Address.Bytes()), nil, 0, 0),
+		BaseAccount: authtypes.NewBaseAccount(sdk.AccAddress(consPriv.PubKey().Address()), nil, 0, 0),
 		CodeHash:    common.BytesToHash(crypto.Keccak256(nil)).String(),
 	}
 	suite.AccountKeeper.SetAccount(suite.Ctx, acc)
-	valAddr := sdk.ValAddress(suite.Address.Bytes())
+	valAddr := sdk.ValAddress(consPriv.PubKey().Address())
 	validator, err := stakingtypes.NewValidator(valAddr.String(), consPriv.PubKey(), stakingtypes.Description{})
+	valCons, _ := validator.GetConsAddr()
+	fmt.Println("validator cons: ", sdk.ConsAddress(valCons))
 	suite.Require().NoError(err)
-	err = suite.App.GetStakingKeeper().SetValidatorByConsAddr(suite.Ctx, validator)
+	err = suite.StakingKeeper.SetValidatorByConsAddr(suite.Ctx, validator)
 	suite.Require().NoError(err)
-	suite.App.GetStakingKeeper().SetValidator(suite.Ctx, validator)
+	err = suite.StakingKeeper.SetValidator(suite.Ctx, validator)
+	suite.Require().NoError(err)
+	allValidators, _ := suite.StakingKeeper.GetAllValidators(suite.Ctx)
+	fmt.Println("all validators in setup test: ", allValidators)
 
 	// add conversion pair for first module deployed contract to evmutil params
 	suite.Keeper.SetParams(suite.Ctx, types.NewParams(
@@ -157,19 +169,20 @@ func (suite *Suite) SetupTest() {
 		),
 	))
 
+	// We need to commit so that the ethermint feemarket beginblock runs to set the minfee
+	// feeMarketKeeper.GetBaseFee() will return nil otherwise
+	suite.Commit()
+
 	queryHelper := baseapp.NewQueryServerTestHelper(suite.Ctx, suite.App.InterfaceRegistry())
 	evmtypes.RegisterQueryServer(queryHelper, suite.App.GetEvmKeeper())
 	suite.QueryClientEvm = evmtypes.NewQueryClient(queryHelper)
 	types.RegisterQueryServer(queryHelper, keeper.NewQueryServerImpl(suite.App.GetEvmutilKeeper()))
 	suite.QueryClient = types.NewQueryClient(queryHelper)
-
-	// We need to commit so that the ethermint feemarket beginblock runs to set the minfee
-	// feeMarketKeeper.GetBaseFee() will return nil otherwise
-	suite.Commit()
 }
 
 func (suite *Suite) Commit() {
-	_, _ = suite.App.Commit()
+	_, err := suite.App.Commit()
+	suite.Require().NoError(err)
 	header := suite.Ctx.BlockHeader()
 	header.Height += 1
 	suite.App.FinalizeBlock(&abci.RequestFinalizeBlock{

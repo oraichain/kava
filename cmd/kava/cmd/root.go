@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 
+	"cosmossdk.io/log"
 	confixcmd "cosmossdk.io/tools/confix/cmd"
 	tmcfg "github.com/cometbft/cometbft/config"
 	"github.com/cosmos/cosmos-sdk/client"
@@ -12,17 +13,22 @@ import (
 	"github.com/cosmos/cosmos-sdk/server"
 
 	tmcli "github.com/cometbft/cometbft/libs/cli"
+	dbm "github.com/cosmos/cosmos-db"
+	simtestutil "github.com/cosmos/cosmos-sdk/testutil/sims"
 	"github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	"github.com/cosmos/cosmos-sdk/x/crisis"
 	genutilcli "github.com/cosmos/cosmos-sdk/x/genutil/client/cli"
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 	ethermintclient "github.com/evmos/ethermint/client"
 	"github.com/evmos/ethermint/crypto/hd"
 	servercfg "github.com/evmos/ethermint/server/config"
+	ethermintflags "github.com/evmos/ethermint/server/flags"
 	"github.com/kava-labs/kava/app"
 	"github.com/kava-labs/kava/app/params"
 	kavaclient "github.com/kava-labs/kava/client"
 	"github.com/kava-labs/kava/migrate"
+	"github.com/spf13/cast"
 	"github.com/spf13/cobra"
 )
 
@@ -33,7 +39,16 @@ const EnvPrefix = "KAVA"
 func NewRootCmd() *cobra.Command {
 	app.SetSDKConfig().Seal()
 
+	appOpts := simtestutil.NewAppOptionsWithFlagHome(tempDir())
 	encodingConfig := app.MakeEncodingConfig()
+	tempApp := app.NewApp(log.NewNopLogger(), dbm.NewMemDB(), cast.ToString(appOpts.Get(flags.FlagHome)), nil, encodingConfig, app.Options{
+		SkipLoadLatest:        false,
+		SkipGenesisInvariants: cast.ToBool(appOpts.Get(crisis.FlagSkipGenesisInvariants)),
+		InvariantCheckPeriod:  cast.ToUint(appOpts.Get(server.FlagInvCheckPeriod)),
+		MempoolEnableAuth:     false,
+		EVMTrace:              cast.ToString(appOpts.Get(ethermintflags.EVMTracer)),
+		EVMMaxGasWanted:       cast.ToUint64(appOpts.Get(ethermintflags.EVMMaxTxGasWanted)),
+	})
 
 	initClientCtx := client.Context{}.
 		WithCodec(encodingConfig.Marshaler).
@@ -74,23 +89,23 @@ func NewRootCmd() *cobra.Command {
 		},
 	}
 
-	addSubCmds(rootCmd, encodingConfig, app.DefaultNodeHome)
+	addSubCmds(rootCmd, encodingConfig, app.DefaultNodeHome, *tempApp)
 
 	return rootCmd
 }
 
 // addSubCmds registers all the sub commands used by kava.
-func addSubCmds(rootCmd *cobra.Command, encodingConfig params.EncodingConfig, defaultNodeHome string) {
+func addSubCmds(rootCmd *cobra.Command, encodingConfig params.EncodingConfig, defaultNodeHome string, app app.App) {
 	rootCmd.AddCommand(
 		ethermintclient.ValidateChainID(
-			genutilcli.InitCmd(app.ModuleBasics, defaultNodeHome),
+			genutilcli.InitCmd(app.BasicModuleManager, defaultNodeHome),
 		),
 		genutilcli.CollectGenTxsCmd(banktypes.GenesisBalancesIterator{}, defaultNodeHome, genutiltypes.DefaultMessageValidator,
 			encodingConfig.TxConfig.SigningContext().ValidatorAddressCodec()),
 		migrate.MigrateGenesisCmd(),
-		migrate.AssertInvariantsCmd(encodingConfig),
-		genutilcli.GenTxCmd(app.ModuleBasics, encodingConfig.TxConfig, banktypes.GenesisBalancesIterator{}, defaultNodeHome, encodingConfig.TxConfig.SigningContext().ValidatorAddressCodec()),
-		genutilcli.ValidateGenesisCmd(app.ModuleBasics),
+		migrate.AssertInvariantsCmd(encodingConfig, app.BasicModuleManager),
+		genutilcli.GenTxCmd(app.BasicModuleManager, encodingConfig.TxConfig, banktypes.GenesisBalancesIterator{}, defaultNodeHome, encodingConfig.TxConfig.SigningContext().ValidatorAddressCodec()),
+		genutilcli.ValidateGenesisCmd(app.BasicModuleManager),
 		AddGenesisAccountCmd(defaultNodeHome),
 		tmcli.NewCompletionCmd(rootCmd, true), // TODO add other shells, drop tmcli dependency, unhide?
 		// testnetCmd(app.ModuleBasics, banktypes.GenesisBalancesIterator{}), // TODO add
@@ -110,6 +125,16 @@ func addSubCmds(rootCmd *cobra.Command, encodingConfig params.EncodingConfig, de
 		StatusCommand(),
 		newQueryCmd(),
 		newTxCmd(),
-		kavaclient.KeyCommands(app.DefaultNodeHome),
+		kavaclient.KeyCommands(defaultNodeHome),
 	)
+}
+
+var tempDir = func() string {
+	dir, err := os.MkdirTemp("", "kavad")
+	if err != nil {
+		panic("failed to create temp dir: " + err.Error())
+	}
+	defer os.RemoveAll(dir)
+
+	return dir
 }

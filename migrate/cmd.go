@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	tmtypes "github.com/cometbft/cometbft/types"
+	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/cosmos/cosmos-sdk/version"
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 	"github.com/spf13/cobra"
@@ -53,7 +54,7 @@ func MigrateGenesisCmd() *cobra.Command {
 	return cmd
 }
 
-func AssertInvariantsCmd(config params.EncodingConfig) *cobra.Command {
+func AssertInvariantsCmd(config params.EncodingConfig, mbm module.BasicManager) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "assert-invariants [genesis-file]",
 		Short:   "Validates that the input genesis file is valid and invariants pass",
@@ -72,7 +73,7 @@ func AssertInvariantsCmd(config params.EncodingConfig) *cobra.Command {
 			if err := json.Unmarshal(genDoc.AppState, &newAppState); err != nil {
 				return fmt.Errorf("failed to marshal app state from genesis doc: %s: %w", importGenesis, err)
 			}
-			err = app.ModuleBasics.ValidateGenesis(config.Marshaler, config.TxConfig, newAppState)
+			err = mbm.ValidateGenesis(config.Marshaler, config.TxConfig, newAppState)
 			if err != nil {
 				return fmt.Errorf("genesis doc did not pass validate genesis: %s: %w", importGenesis, err)
 			}

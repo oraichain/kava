@@ -31,14 +31,14 @@ func TestNewApp(t *testing.T) {
 func TestExport(t *testing.T) {
 	SetSDKConfig()
 	db := db.NewMemDB()
-	app := NewApp(log.NewTestLogger(t), db, DefaultNodeHome, nil, MakeEncodingConfig(), DefaultOptions, baseapp.SetChainID(testChainID))
+	app := NewApp(log.NewTestLogger(t), db, DefaultNodeHome, nil, MakeEncodingConfig(), DefaultOptions, baseapp.SetChainID(TestChainID))
 
-	stateBytes, err := json.Marshal(NewDefaultGenesisState())
+	stateBytes, err := json.Marshal(app.NewDefaultGenesisState())
 	require.NoError(t, err)
 
 	initRequest := &abci.RequestInitChain{
 		Time:            time.Date(1998, 1, 1, 0, 0, 0, 0, time.UTC),
-		ChainId:         testChainID,
+		ChainId:         TestChainID,
 		InitialHeight:   1,
 		ConsensusParams: simtestutil.DefaultConsensusParams,
 		Validators:      nil,

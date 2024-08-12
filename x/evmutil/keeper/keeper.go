@@ -51,6 +51,10 @@ func (k *Keeper) SetEvmKeeper(evmKeeper types.EvmKeeper) {
 	k.evmKeeper = evmKeeper
 }
 
+func (k *Keeper) GetEvmKeeper() types.EvmKeeper {
+	return k.evmKeeper
+}
+
 // GetAllAccounts returns all accounts.
 func (k Keeper) GetAllAccounts(ctx sdk.Context) (accounts []types.Account) {
 	k.IterateAllAccounts(ctx, func(account types.Account) bool {

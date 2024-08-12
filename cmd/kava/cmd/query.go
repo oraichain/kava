@@ -6,8 +6,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/rpc"
 	authcmd "github.com/cosmos/cosmos-sdk/x/auth/client/cli"
 	"github.com/spf13/cobra"
-
-	"github.com/kava-labs/kava/app"
 )
 
 // newQueryCmd creates all the commands for querying blockchain state.
@@ -29,7 +27,6 @@ func newQueryCmd() *cobra.Command {
 		authcmd.QueryTxCmd(),
 	)
 
-	app.ModuleBasics.AddQueryCommands(cmd)
 	cmd.PersistentFlags().String(flags.FlagChainID, "", "The network chain ID")
 
 	return cmd

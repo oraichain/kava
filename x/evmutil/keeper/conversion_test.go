@@ -1,6 +1,7 @@
 package keeper_test
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -140,6 +141,12 @@ func (suite *ConversionTestSuite) TestUnlockERC20Tokens_Insufficient() {
 }
 
 func (suite *ConversionTestSuite) TestConvertCoinToERC20() {
+	proposer := suite.Ctx.BlockHeader().ProposerAddress
+	fmt.Println("proposer: ", sdk.ConsAddress(proposer))
+	validators, err := suite.StakingKeeper.GetAllValidators(suite.Ctx)
+	fmt.Println("validators: ", validators, err)
+	_, err = suite.StakingKeeper.GetValidatorByConsAddr(suite.Ctx, sdk.ConsAddress(proposer))
+	fmt.Println("err: ", err)
 	contractAddr := suite.DeployERC20()
 
 	pair := types.NewConversionPair(

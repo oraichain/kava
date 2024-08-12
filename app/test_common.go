@@ -39,7 +39,7 @@ import (
 
 var (
 	emptyTime            time.Time
-	testChainID                = "kavatest_1-1"
+	TestChainID                = "kavatest_1-1"
 	defaultInitialHeight int64 = 1
 )
 
@@ -75,7 +75,7 @@ func NewTestAppFromSealed() TestApp {
 
 	encCfg := MakeEncodingConfig()
 
-	app := NewApp(log.NewNopLogger(), db, DefaultNodeHome, nil, encCfg, DefaultOptions)
+	app := NewApp(log.NewNopLogger(), db, DefaultNodeHome, nil, encCfg, DefaultOptions, baseapp.SetChainID(TestChainID))
 	return TestApp{App: *app}
 }
 
@@ -108,13 +108,13 @@ func (app *App) AppCodec() codec.Codec {
 // InitializeFromGenesisStates calls InitChain on the app using the provided genesis states.
 // If any module genesis states are missing, defaults are used.
 func (tApp TestApp) InitializeFromGenesisStates(genesisStates ...GenesisState) TestApp {
-	return tApp.InitializeFromGenesisStatesWithTimeAndChainIDAndHeight(emptyTime, testChainID, defaultInitialHeight, genesisStates...)
+	return tApp.InitializeFromGenesisStatesWithTimeAndChainIDAndHeight(emptyTime, TestChainID, defaultInitialHeight, genesisStates...)
 }
 
 // InitializeFromGenesisStatesWithTime calls InitChain on the app using the provided genesis states and time.
 // If any module genesis states are missing, defaults are used.
 func (tApp TestApp) InitializeFromGenesisStatesWithTime(genTime time.Time, genesisStates ...GenesisState) TestApp {
-	return tApp.InitializeFromGenesisStatesWithTimeAndChainIDAndHeight(genTime, testChainID, defaultInitialHeight, genesisStates...)
+	return tApp.InitializeFromGenesisStatesWithTimeAndChainIDAndHeight(genTime, TestChainID, defaultInitialHeight, genesisStates...)
 }
 
 // InitializeFromGenesisStatesWithTimeAndChainID calls InitChain on the app using the provided genesis states, time, and chain id.
@@ -127,7 +127,7 @@ func (tApp TestApp) InitializeFromGenesisStatesWithTimeAndChainID(genTime time.T
 // If any module genesis states are missing, defaults are used.
 func (tApp TestApp) InitializeFromGenesisStatesWithTimeAndChainIDAndHeight(genTime time.Time, chainID string, initialHeight int64, genesisStates ...GenesisState) TestApp {
 	// Create a default genesis state and overwrite with provided values
-	genesisState := NewDefaultGenesisState()
+	genesisState := tApp.NewDefaultGenesisState()
 	for _, state := range genesisStates {
 		for k, v := range state {
 			genesisState[k] = v
@@ -139,7 +139,7 @@ func (tApp TestApp) InitializeFromGenesisStatesWithTimeAndChainIDAndHeight(genTi
 	if err != nil {
 		panic(err)
 	}
-	tApp.InitChain(
+	_, err = tApp.InitChain(
 		&abci.RequestInitChain{
 			Time:          genTime,
 			Validators:    []abci.ValidatorUpdate{},

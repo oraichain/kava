@@ -5,8 +5,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	authcmd "github.com/cosmos/cosmos-sdk/x/auth/client/cli"
 	"github.com/spf13/cobra"
-
-	"github.com/kava-labs/kava/app"
 )
 
 // newTxCmd creates all commands for submitting blockchain transactions.
@@ -30,7 +28,6 @@ func newTxCmd() *cobra.Command {
 		authcmd.GetDecodeCommand(),
 	)
 
-	app.ModuleBasics.AddTxCommands(cmd)
 	cmd.PersistentFlags().String(flags.FlagChainID, "", "The network chain ID")
 
 	return cmd
