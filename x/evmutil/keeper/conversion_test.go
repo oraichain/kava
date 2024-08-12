@@ -51,7 +51,7 @@ func (suite *ConversionTestSuite) TestBurn_InsufficientBalance() {
 
 	err := suite.Keeper.BurnConversionPairCoin(suite.Ctx, pair, sdk.NewCoin(pair.Denom, amount), recipient)
 	suite.Require().Error(err)
-	suite.Require().Equal("0erc20/usdc is smaller than 100erc20/usdc: insufficient funds", err.Error())
+	suite.Require().Equal("spendable balance 0erc20/usdc is smaller than 100erc20/usdc: insufficient funds", err.Error())
 }
 
 func (suite *ConversionTestSuite) TestBurn() {
@@ -245,7 +245,7 @@ func (suite *ConversionTestSuite) TestConvertCoinToERC20_InsufficientBalance() {
 	)
 
 	suite.Require().Error(err)
-	suite.Require().Equal("0erc20/usdc is smaller than 100erc20/usdc: insufficient funds", err.Error())
+	suite.Require().Equal("spendable balance 0erc20/usdc is smaller than 100erc20/usdc: insufficient funds", err.Error())
 }
 
 func (suite *ConversionTestSuite) TestConvertCoinToERC20_NotEnabled() {
