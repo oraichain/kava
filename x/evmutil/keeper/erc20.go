@@ -18,6 +18,8 @@ import (
 
 const (
 	erc20BalanceOfMethod = "balanceOf"
+	erc20TotalSupplyMethod = "totalSupply"
+
 )
 
 // DeployTestMintableERC20Contract deploys an ERC20 contract on the EVM as the
@@ -57,10 +59,11 @@ func (k Keeper) DeployTestMintableERC20Contract(
 	}
 
 	contractAddr := crypto.CreateAddress(types.ModuleEVMAddress, nonce)
-	_, err = k.CallEVMWithData(ctx, types.ModuleEVMAddress, nil, data)
+	ret, err := k.CallEVMWithData(ctx, types.ModuleEVMAddress, nil, data)
 	if err != nil {
 		return types.InternalEVMAddress{}, fmt.Errorf("failed to deploy ERC20 for %s: %w", name, err)
 	}
+	fmt.Println("ret deploy test erc20: ", ret.Logs, ret.VmError)
 
 	return types.NewInternalEVMAddress(contractAddr), nil
 }
@@ -73,7 +76,7 @@ func (k Keeper) MintERC20(
 	receiver types.InternalEVMAddress,
 	amount *big.Int,
 ) error {
-	_, err := k.CallEVM(
+	ret, err := k.CallEVM(
 		ctx,
 		types.ERC20MintableBurnableContract.ABI,
 		types.ModuleEVMAddress,
@@ -83,6 +86,7 @@ func (k Keeper) MintERC20(
 		receiver.Address,
 		amount,
 	)
+	fmt.Println("mint erc20 ret: ", ret)
 
 	return err
 }
@@ -127,6 +131,60 @@ func (k Keeper) QueryERC20BalanceOf(
 		return nil, fmt.Errorf(
 			"invalid ERC20 %v call return outputs %v, expected %v",
 			erc20BalanceOfMethod,
+			len(anyOutput),
+			1,
+		)
+	}
+
+	bal, ok := anyOutput[0].(*big.Int)
+	if !ok {
+		return nil, fmt.Errorf(
+			"invalid ERC20 return type %T, expected %T",
+			anyOutput[0],
+			&big.Int{},
+		)
+	}
+
+	return bal, nil
+}
+
+func (k Keeper) QueryERC20Supply(
+	ctx sdk.Context,
+	contractAddr types.InternalEVMAddress,
+) (*big.Int, error) {
+	res, err := k.CallEVM(
+		ctx,
+		types.ERC20MintableBurnableContract.ABI,
+		types.ModuleEVMAddress,
+		contractAddr,
+		erc20TotalSupplyMethod,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if res.Failed() {
+		if res.VmError == vm.ErrExecutionReverted.Error() {
+			// Unpacks revert
+			return nil, evmtypes.NewExecErrorWithReason(res.Ret)
+		}
+
+		return nil, status.Error(codes.Internal, res.VmError)
+	}
+
+	anyOutput, err := types.ERC20MintableBurnableContract.ABI.Unpack(erc20TotalSupplyMethod, res.Ret)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to unpack method %v response: %w",
+			erc20TotalSupplyMethod,
+			err,
+		)
+	}
+
+	if len(anyOutput) != 1 {
+		return nil, fmt.Errorf(
+			"invalid ERC20 %v call return outputs %v, expected %v",
+			erc20TotalSupplyMethod,
 			len(anyOutput),
 			1,
 		)

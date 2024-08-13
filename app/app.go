@@ -50,6 +50,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/bank"
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	"github.com/cosmos/cosmos-sdk/x/params"
 	"github.com/cosmos/gogoproto/proto"
 	"github.com/cosmos/ibc-go/modules/capability"
 	capabilitykeeper "github.com/cosmos/ibc-go/modules/capability/keeper"
@@ -72,7 +73,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/mint"
 	mintkeeper "github.com/cosmos/cosmos-sdk/x/mint/keeper"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
-	"github.com/cosmos/cosmos-sdk/x/params"
 	paramsclient "github.com/cosmos/cosmos-sdk/x/params/client"
 	paramskeeper "github.com/cosmos/cosmos-sdk/x/params/keeper"
 	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
@@ -383,7 +383,7 @@ func NewApp(
 
 	// Create Ethermint keepers
 	app.feeMarketKeeper = feemarketkeeper.NewKeeper(
-		appCodec, authtypes.NewModuleAddress(govtypes.ModuleName), runtime.NewKVStoreService(keys[feemarkettypes.StoreKey]), keys[feemarkettypes.TransientKey], feemarketSubspace,
+		appCodec, authtypes.NewModuleAddress(govtypes.ModuleName), runtime.NewKVStoreService(keys[feemarkettypes.StoreKey]), tkeys[feemarkettypes.TransientKey], feemarketSubspace,
 	)
 
 	app.evmutilKeeper = evmutilkeeper.NewKeeper(
@@ -521,8 +521,8 @@ func NewApp(
 		slashingtypes.ModuleName,
 		evidencetypes.ModuleName,
 		stakingtypes.ModuleName,
-		feemarkettypes.ModuleName,
 		evmtypes.ModuleName,
+		feemarkettypes.ModuleName,
 
 		// Auction begin blocker will close out expired auctions and pay debt back to cdp.
 		// It should be run before cdp begin blocker which cancels out debt with stable and starts more auctions.
@@ -549,10 +549,10 @@ func NewApp(
 		crisistypes.ModuleName,
 		govtypes.ModuleName,
 		stakingtypes.ModuleName,
-		minttypes.ModuleName,
 		evmtypes.ModuleName,
 		// fee market module must go after evm module in order to retrieve the block gas used.
 		feemarkettypes.ModuleName,
+		minttypes.ModuleName,
 
 		// Add all remaining modules with an empty end blocker below since cosmos 0.45.0 requires it
 		capabilitytypes.ModuleName,
@@ -591,15 +591,13 @@ func NewApp(
 		ibctransfertypes.ModuleName,
 		evmtypes.ModuleName,
 		feemarkettypes.ModuleName,
-
-		evmutiltypes.ModuleName,
-
 		genutiltypes.ModuleName, // runs arbitrary txs included in genisis state, so run after modules have been initialized
 		// Add all remaining modules with an empty InitGenesis below since cosmos 0.45.0 requires it
 		vestingtypes.ModuleName,
 		paramstypes.ModuleName,
 		upgradetypes.ModuleName,
-		crisistypes.ModuleName,  // runs the invariants at genesis, should run after other modules
+		crisistypes.ModuleName, // runs the invariants at genesis, should run after other modules
+		evmutiltypes.ModuleName,
 	)
 
 	app.mm.RegisterInvariants(app.crisisKeeper)

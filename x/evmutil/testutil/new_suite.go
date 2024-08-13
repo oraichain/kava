@@ -1,0 +1,413 @@
+package testutil
+
+import (
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"math/big"
+	"reflect"
+	"time"
+
+	sdkmath "cosmossdk.io/math"
+	abci "github.com/cometbft/cometbft/abci/types"
+	"github.com/cometbft/cometbft/crypto/tmhash"
+	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	tmversion "github.com/cometbft/cometbft/proto/tendermint/version"
+	"github.com/cometbft/cometbft/version"
+	"github.com/cosmos/cosmos-sdk/baseapp"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
+	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
+	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/evmos/ethermint/crypto/ethsecp256k1"
+	"github.com/evmos/ethermint/server/config"
+	etherminttests "github.com/evmos/ethermint/tests"
+	etherminttypes "github.com/evmos/ethermint/types"
+	evmtypes "github.com/evmos/ethermint/x/evm/types"
+	"github.com/kava-labs/kava/app"
+	"github.com/kava-labs/kava/x/evmutil/keeper"
+	"github.com/kava-labs/kava/x/evmutil/types"
+	"github.com/stretchr/testify/suite"
+)
+
+type NewSuite struct {
+	suite.Suite
+
+	App            app.TestAppV2
+	Ctx            sdk.Context
+	Address        common.Address
+	BankKeeper     bankkeeper.Keeper
+	AccountKeeper  authkeeper.AccountKeeper
+	StakingKeeper  *stakingkeeper.Keeper
+	Keeper         keeper.Keeper
+	EvmBankKeeper  keeper.EvmBankKeeper
+	Addrs          []sdk.AccAddress
+	EvmModuleAddr  sdk.AccAddress
+	QueryClient    types.QueryClient
+	QueryClientEvm evmtypes.QueryClient
+	Key1           *ethsecp256k1.PrivKey
+	Key1Addr       types.InternalEVMAddress
+	Key2           *ethsecp256k1.PrivKey
+	consAddress    sdk.ConsAddress
+}
+
+func (suite *NewSuite) SetupTest() {
+	tApp := app.NewTestAppV2()
+	suite.App = tApp
+
+	suite.App = tApp
+	suite.BankKeeper = tApp.GetBankKeeper()
+	suite.AccountKeeper = tApp.GetAccountKeeper()
+	suite.StakingKeeper = tApp.GetStakingKeeper()
+	suite.Keeper = tApp.GetEvmutilKeeper()
+	suite.EvmBankKeeper = keeper.NewEvmBankKeeper(tApp.GetEvmutilKeeper(), suite.BankKeeper, suite.AccountKeeper)
+	suite.EvmModuleAddr = suite.AccountKeeper.GetModuleAddress(evmtypes.ModuleName)
+
+	ecdsaPriv, err := crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+	suite.Require().NoError(err)
+	priv := &ethsecp256k1.PrivKey{
+		Key: crypto.FromECDSA(ecdsaPriv),
+	}
+	suite.Address = common.BytesToAddress(priv.PubKey().Address().Bytes())
+
+	// test evm user keys that have no minting permissions
+	key1, err := ethsecp256k1.GenerateKey()
+	suite.Require().NoError(err)
+	suite.Key1 = key1
+	suite.Key1Addr = types.NewInternalEVMAddress(common.BytesToAddress(suite.Key1.PubKey().Address()))
+	suite.Key2, err = ethsecp256k1.GenerateKey()
+	suite.Require().NoError(err)
+
+	_, addrs := app.GeneratePrivKeyAddressPairs(4)
+	suite.Addrs = addrs
+
+	// cdc := suite.App.AppCodec()
+	// coins := sdk.NewCoins(sdk.NewInt64Coin("ukava", 1000_000_000_000_000_000))
+	// authGS := app.NewFundedGenStateWithSameCoins(cdc, coins, []sdk.AccAddress{
+	// 	sdk.AccAddress(suite.Key1.PubKey().Address()),
+	// 	sdk.AccAddress(suite.Key2.PubKey().Address()),
+	// })
+	// suite.App.InitializeFromGenesisStates(authGS, gs)
+
+	// consensus key - needed to set up evm module
+	consPriv, err := ethsecp256k1.GenerateKey()
+	suite.Require().NoError(err)
+	suite.consAddress = sdk.ConsAddress(consPriv.PubKey().Address())
+	fmt.Println("cons address: ", suite.consAddress)
+
+	// InitializeFromGenesisStates commits first block so we start at 2 here
+	suite.Ctx = suite.App.NewContextLegacy(false, tmproto.Header{
+		Height:          suite.App.LastBlockHeight() + 1,
+		ChainID:         tApp.ChainID(),
+		Time:            time.Now().UTC(),
+		ProposerAddress: suite.consAddress.Bytes(),
+		Version: tmversion.Consensus{
+			Block: version.BlockProtocol,
+		},
+		LastBlockId: tmproto.BlockID{
+			Hash: tmhash.Sum([]byte("block_id")),
+			PartSetHeader: tmproto.PartSetHeader{
+				Total: 11,
+				Hash:  tmhash.Sum([]byte("partset_header")),
+			},
+		},
+		AppHash:            tmhash.Sum([]byte("app")),
+		DataHash:           tmhash.Sum([]byte("data")),
+		EvidenceHash:       tmhash.Sum([]byte("evidence")),
+		ValidatorsHash:     tmhash.Sum([]byte("validators")),
+		NextValidatorsHash: tmhash.Sum([]byte("next_validators")),
+		ConsensusHash:      tmhash.Sum([]byte("consensus")),
+		LastResultsHash:    tmhash.Sum([]byte("last_result")),
+	})
+
+	queryHelper := baseapp.NewQueryServerTestHelper(suite.Ctx, suite.App.InterfaceRegistry())
+	evmtypes.RegisterQueryServer(queryHelper, suite.App.GetEvmKeeper())
+	suite.QueryClientEvm = evmtypes.NewQueryClient(queryHelper)
+	types.RegisterQueryServer(queryHelper, keeper.NewQueryServerImpl(suite.App.GetEvmutilKeeper()))
+	suite.QueryClient = types.NewQueryClient(queryHelper)
+
+	accNum := suite.App.GetAccountKeeper().NextAccountNumber(suite.Ctx)
+
+	// We need to set the validator as calling the EVM looks up the validator address
+	// https://github.com/evmos/ethermint/blob/f21592ebfe74da7590eb42ed926dae970b2a9a3f/x/evm/keeper/state_transition.go#L487
+	// evmkeeper.EVMConfig() will return error "failed to load evm config" if not set
+	acc := &etherminttypes.EthAccount{
+		BaseAccount: authtypes.NewBaseAccount(sdk.AccAddress(suite.consAddress.Bytes()), nil, accNum, 0),
+		CodeHash:    common.BytesToHash(crypto.Keccak256(nil)).String(),
+	}
+	suite.AccountKeeper.SetAccount(suite.Ctx, acc)
+	valAddr := sdk.ValAddress(suite.consAddress.Bytes())
+	validator, err := stakingtypes.NewValidator(valAddr.String(), consPriv.PubKey(), stakingtypes.Description{})
+	valCons, _ := validator.GetConsAddr()
+	fmt.Println("validator cons: ", sdk.ConsAddress(valCons))
+	suite.Require().NoError(err)
+	err = suite.StakingKeeper.SetValidatorByConsAddr(suite.Ctx, validator)
+	suite.Require().NoError(err)
+	err = suite.StakingKeeper.SetValidator(suite.Ctx, validator)
+	suite.Require().NoError(err)
+	allValidators, _ := suite.StakingKeeper.GetAllValidators(suite.Ctx)
+	fmt.Println("all validators in setup test: ", allValidators)
+
+	// add conversion pair for first module deployed contract to evmutil params
+	suite.Keeper.SetParams(suite.Ctx, types.NewParams(
+		types.NewConversionPairs(
+			types.NewConversionPair(
+				// First contract this module deploys
+				MustNewInternalEVMAddressFromString("0x15932E26f5BD4923d46a2b205191C4b5d5f43FE3"),
+				"erc20/usdc",
+			),
+		),
+	))
+
+	// tkey := suite.App.GetTKey(feemarkettypes.TransientKey)
+	// feemarketKeeper := suite.App.GetFeeMarketKeeper()
+	// fmt.Println("tkey: ", tkey)
+	// gas := feemarketKeeper.GetTransientGasWanted(suite.Ctx)
+	// fmt.Println("gas: ", gas)
+
+	// We need to commit so that the ethermint feemarket beginblock runs to set the minfee
+	// feeMarketKeeper.GetBaseFee() will return nil otherwise
+	// suite.App.FinalizeBlock(&abci.RequestFinalizeBlock{
+	// 	Height: suite.Ctx.BlockHeight(),
+	// })
+	_, err = suite.App.FinalizeBlock(&abci.RequestFinalizeBlock{
+		Height: suite.Ctx.BlockHeight(),
+	})
+	suite.Require().NoError(err)
+	suite.Commit()
+}
+
+func (suite *NewSuite) Commit() {
+	header := suite.Ctx.BlockHeader()
+	_, err := suite.App.FinalizeBlock(&abci.RequestFinalizeBlock{
+		Height: header.Height,
+	})
+	suite.Require().NoError(err)
+
+	_, err = suite.App.Commit()
+	suite.Require().NoError(err)
+
+	header.Height += 1
+	_, err = suite.App.FinalizeBlock(&abci.RequestFinalizeBlock{
+		Height: header.Height,
+	})
+	suite.Require().NoError(err)
+
+	// update ctx
+	suite.Ctx = suite.App.BaseApp.NewContextLegacy(false, header)
+
+	queryHelper := baseapp.NewQueryServerTestHelper(suite.Ctx, suite.App.InterfaceRegistry())
+	evmtypes.RegisterQueryServer(queryHelper, suite.App.GetEvmKeeper())
+	suite.QueryClient = types.NewQueryClient(queryHelper)
+}
+
+func (suite *NewSuite) FundAccountWithKava(addr sdk.AccAddress, coins sdk.Coins) {
+	ukava := coins.AmountOf("ukava")
+	if ukava.IsPositive() {
+		err := suite.App.FundAccount(suite.Ctx, addr, sdk.NewCoins(sdk.NewCoin("ukava", ukava)))
+		suite.Require().NoError(err)
+	}
+	akava := coins.AmountOf("akava")
+	if akava.IsPositive() {
+		err := suite.Keeper.SetBalance(suite.Ctx, addr, akava)
+		suite.Require().NoError(err)
+	}
+}
+
+func (suite *NewSuite) FundModuleAccountWithKava(moduleName string, coins sdk.Coins) {
+	ukava := coins.AmountOf("ukava")
+	if ukava.IsPositive() {
+		err := suite.App.FundModuleAccount(suite.Ctx, moduleName, sdk.NewCoins(sdk.NewCoin("ukava", ukava)))
+		suite.Require().NoError(err)
+	}
+	akava := coins.AmountOf("akava")
+	if akava.IsPositive() {
+		addr := suite.AccountKeeper.GetModuleAddress(moduleName)
+		err := suite.Keeper.SetBalance(suite.Ctx, addr, akava)
+		suite.Require().NoError(err)
+	}
+}
+
+func (suite *NewSuite) DeployERC20() types.InternalEVMAddress {
+	// make sure module account is created
+	// qq: any better ways to do this?
+	suite.App.FundModuleAccount(
+		suite.Ctx,
+		types.ModuleName,
+		sdk.NewCoins(sdk.NewCoin("ukava", sdkmath.NewInt(0))),
+	)
+
+	contractAddr, err := suite.Keeper.DeployTestMintableERC20Contract(suite.Ctx, "USDC", "USDC", uint8(18))
+	suite.Require().NoError(err)
+	suite.Require().Greater(len(contractAddr.Address), 0)
+	return contractAddr
+}
+
+func (suite *NewSuite) GetERC20BalanceOf(
+	contractAbi abi.ABI,
+	contractAddr types.InternalEVMAddress,
+	accountAddr types.InternalEVMAddress,
+) *big.Int {
+	// Query ERC20.balanceOf()
+	addr := common.BytesToAddress(suite.Key1.PubKey().Address())
+	res, err := suite.QueryContract(
+		types.ERC20MintableBurnableContract.ABI,
+		addr,
+		suite.Key1,
+		contractAddr,
+		"balanceOf",
+		accountAddr.Address,
+	)
+	suite.Require().NoError(err)
+	suite.Require().Len(res, 1)
+
+	balance, ok := res[0].(*big.Int)
+	suite.Require().True(ok, "balanceOf should respond with *big.Int")
+	return balance
+}
+
+func (suite *NewSuite) QueryContract(
+	contractAbi abi.ABI,
+	from common.Address,
+	fromKey *ethsecp256k1.PrivKey,
+	contract types.InternalEVMAddress,
+	method string,
+	args ...interface{},
+) ([]interface{}, error) {
+	// Pack query args
+	data, err := contractAbi.Pack(method, args...)
+	suite.Require().NoError(err)
+
+	// Send TX
+	res, err := suite.SendTx(contract, from, fromKey, data)
+	suite.Require().NoError(err)
+
+	// Check for VM errors and unpack returned data
+	switch res.VmError {
+	case vm.ErrExecutionReverted.Error():
+		response, err := abi.UnpackRevert(res.Ret)
+		suite.Require().NoError(err)
+
+		return nil, errors.New(response)
+	case "": // No error, continue
+	default:
+		panic(fmt.Sprintf("unhandled vm error response: %v", res.VmError))
+	}
+
+	// Unpack response
+	unpackedRes, err := contractAbi.Unpack(method, res.Ret)
+	suite.Require().NoErrorf(err, "failed to unpack method %v response", method)
+
+	return unpackedRes, nil
+}
+
+// SendTx submits a transaction to the block.
+func (suite *NewSuite) SendTx(
+	contractAddr types.InternalEVMAddress,
+	from common.Address,
+	signerKey *ethsecp256k1.PrivKey,
+	transferData []byte,
+) (*evmtypes.MsgEthereumTxResponse, error) {
+	ctx := sdk.WrapSDKContext(suite.Ctx)
+	chainID := suite.App.GetEvmKeeper().ChainID()
+
+	args, err := json.Marshal(&evmtypes.TransactionArgs{
+		To:   &contractAddr.Address,
+		From: &from,
+		Data: (*hexutil.Bytes)(&transferData),
+	})
+	if err != nil {
+		return nil, err
+	}
+	gasRes, err := suite.QueryClientEvm.EstimateGas(ctx, &evmtypes.EthCallRequest{
+		Args:   args,
+		GasCap: config.DefaultGasCap,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	nonce := suite.App.GetEvmKeeper().GetNonce(suite.Ctx, suite.Address)
+
+	baseFee := suite.App.GetFeeMarketKeeper().GetBaseFee(suite.Ctx)
+	suite.Require().NotNil(baseFee, "base fee is nil")
+
+	// Mint the max gas to the FeeCollector to ensure balance in case of refund
+	suite.MintFeeCollector(sdk.NewCoins(
+		sdk.NewCoin(
+			"ukava",
+			sdkmath.NewInt(baseFee.Int64()*int64(gasRes.Gas*2)),
+		)))
+
+	ercTransferTx := evmtypes.NewTx(
+		chainID,
+		nonce,
+		&contractAddr.Address,
+		nil,          // amount
+		gasRes.Gas*2, // gasLimit, TODO: runs out of gas with just res.Gas, ex: estimated was 21572 but used 24814
+		nil,          // gasPrice
+		suite.App.GetFeeMarketKeeper().GetBaseFee(suite.Ctx), // gasFeeCap
+		big.NewInt(1), // gasTipCap
+		transferData,
+		&ethtypes.AccessList{}, // accesses
+	)
+
+	ercTransferTx.From = hex.EncodeToString(signerKey.PubKey().Address())
+	err = ercTransferTx.Sign(ethtypes.LatestSignerForChainID(chainID), etherminttests.NewSigner(signerKey))
+	if err != nil {
+		return nil, err
+	}
+
+	rsp, err := suite.App.GetEvmKeeper().EthereumTx(ctx, ercTransferTx)
+	if err != nil {
+		return nil, err
+	}
+	// Do not check vm error here since we want to check for errors later
+
+	return rsp, nil
+}
+
+func (suite *NewSuite) MintFeeCollector(coins sdk.Coins) {
+	err := suite.App.FundModuleAccount(suite.Ctx, authtypes.FeeCollectorName, coins)
+	suite.Require().NoError(err)
+}
+
+// GetEvents returns emitted events on the sdk context
+func (suite *NewSuite) GetEvents() sdk.Events {
+	return suite.Ctx.EventManager().Events()
+}
+
+// EventsContains asserts that the expected event is in the provided events
+func (suite *NewSuite) EventsContains(events sdk.Events, expectedEvent sdk.Event) {
+	foundMatch := false
+	for _, event := range events {
+		if event.Type == expectedEvent.Type {
+			if reflect.DeepEqual(attrsToMap(expectedEvent.Attributes), attrsToMap(event.Attributes)) {
+				foundMatch = true
+			}
+		}
+	}
+
+	suite.Truef(foundMatch, "event of type %s not found or did not match", expectedEvent.Type)
+}
+
+// EventsDoNotContain asserts that the event is **not** is in the provided events
+func (suite *NewSuite) EventsDoNotContain(events sdk.Events, eventType string) {
+	foundMatch := false
+	for _, event := range events {
+		if event.Type == eventType {
+			foundMatch = true
+		}
+	}
+
+	suite.Falsef(foundMatch, "event of type %s should not be found, but was found", eventType)
+}
