@@ -86,9 +86,7 @@ func (suite *EIP712TestSuite) createTestEIP712CosmosTxBuilder(
 	accNumber := suite.tApp.GetAccountKeeper().GetAccount(suite.ctx, from).GetAccountNumber()
 
 	data := eip712.ConstructUntypedEIP712Data(chainId, accNumber, nonce, 0, fee, msgs, "")
-	typedData, err := eip712.WrapTxToTypedData(ethChainId, msgs, data, &eip712.FeeDelegationOptions{
-		FeePayer: from,
-	}, suite.tApp.GetEvmKeeper().GetParams(suite.ctx))
+	typedData, err := eip712.WrapTxToTypedData(ethChainId, data)
 	suite.Require().NoError(err)
 	sigHash, err := eip712.ComputeTypedDataHash(typedData)
 	suite.Require().NoError(err)
@@ -155,7 +153,7 @@ func (suite *EIP712TestSuite) SetupTest() {
 
 	// Genesis states
 	evmGs := evmtypes.NewGenesisState(
-		evmtypes.NewParams("akava", true, true, true, evmtypes.DefaultChainConfig(), nil, nil, nil),
+		evmtypes.NewParams("akava", true, true, true, evmtypes.DefaultChainConfig(), nil),
 		nil,
 	)
 
@@ -250,72 +248,7 @@ func (suite *EIP712TestSuite) SetupTest() {
 	// allow msgs through evm eip712
 	evmKeeper := suite.tApp.GetEvmKeeper()
 	params := evmKeeper.GetParams(suite.ctx)
-	params.EIP712AllowedMsgs = []evmtypes.EIP712AllowedMsg{
-		{
-			MsgTypeUrl:       "/kava.evmutil.v1beta1.MsgConvertERC20ToCoin",
-			MsgValueTypeName: "MsgValueEVMConvertERC20ToCoin",
-			ValueTypes: []evmtypes.EIP712MsgAttrType{
-				{Name: "initiator", Type: "string"},
-				{Name: "receiver", Type: "string"},
-				{Name: "orai_erc20_address", Type: "string"},
-				{Name: "amount", Type: "string"},
-			},
-		},
-		{
-			MsgTypeUrl:       "/kava.cdp.v1beta1.MsgCreateCDP",
-			MsgValueTypeName: "MsgValueCDPCreate",
-			ValueTypes: []evmtypes.EIP712MsgAttrType{
-				{Name: "sender", Type: "string"},
-				{Name: "collateral", Type: "Coin"},
-				{Name: "principal", Type: "Coin"},
-				{Name: "collateral_type", Type: "string"},
-			},
-		},
-		{
-			MsgTypeUrl:       "/kava.cdp.v1beta1.MsgDeposit",
-			MsgValueTypeName: "MsgValueCDPDeposit",
-			ValueTypes: []evmtypes.EIP712MsgAttrType{
-				{Name: "depositor", Type: "string"},
-				{Name: "owner", Type: "string"},
-				{Name: "collateral", Type: "Coin"},
-				{Name: "collateral_type", Type: "string"},
-			},
-		},
-		{
-			MsgTypeUrl:       "/kava.hard.v1beta1.MsgDeposit",
-			MsgValueTypeName: "MsgValueHardDeposit",
-			ValueTypes: []evmtypes.EIP712MsgAttrType{
-				{Name: "depositor", Type: "string"},
-				{Name: "amount", Type: "Coin[]"},
-			},
-		},
-		{
-			MsgTypeUrl:       "/kava.evmutil.v1beta1.MsgConvertCoinToERC20",
-			MsgValueTypeName: "MsgValueEVMConvertCoinToERC20",
-			ValueTypes: []evmtypes.EIP712MsgAttrType{
-				{Name: "initiator", Type: "string"},
-				{Name: "receiver", Type: "string"},
-				{Name: "amount", Type: "Coin"},
-			},
-		},
-		{
-			MsgTypeUrl:       "/kava.cdp.v1beta1.MsgRepayDebt",
-			MsgValueTypeName: "MsgValueCDPRepayDebt",
-			ValueTypes: []evmtypes.EIP712MsgAttrType{
-				{Name: "sender", Type: "string"},
-				{Name: "collateral_type", Type: "string"},
-				{Name: "payment", Type: "Coin"},
-			},
-		},
-		{
-			MsgTypeUrl:       "/kava.hard.v1beta1.MsgWithdraw",
-			MsgValueTypeName: "MsgValueHardWithdraw",
-			ValueTypes: []evmtypes.EIP712MsgAttrType{
-				{Name: "depositor", Type: "string"},
-				{Name: "amount", Type: "Coin[]"},
-			},
-		},
-	}
+
 	evmKeeper.SetParams(suite.ctx, params)
 
 	// give test address 50k erc20 usdc to begin with

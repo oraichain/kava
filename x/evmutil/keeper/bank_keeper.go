@@ -242,10 +242,6 @@ func (k EvmBankKeeper) SpendableCoins(ctx sdk.Context, addr sdk.AccAddress) sdk.
 	return k.bk.SpendableCoins(ctx, addr)
 }
 
-func (k EvmBankKeeper) SpendableCoin(ctx context.Context, addr sdk.AccAddress, denom string) sdk.Coin {
-	return k.bk.SpendableCoin(ctx, addr, denom)
-}
-
 // SplitAkavaCoins splits akava coins to the equivalent ukava coins and any remaining akava balance.
 // An error will be returned if the coins are not valid or if the coins are not the akava denom.
 func SplitAkavaCoins(coins sdk.Coins, evmDenom, cosmosDenom string) (sdk.Coin, sdkmath.Int, error) {

@@ -55,7 +55,6 @@ import (
 	"github.com/cosmos/ibc-go/modules/capability"
 	capabilitykeeper "github.com/cosmos/ibc-go/modules/capability/keeper"
 	capabilitytypes "github.com/cosmos/ibc-go/modules/capability/types"
-	"github.com/ethereum/go-ethereum/core/vm"
 
 	"github.com/cosmos/cosmos-sdk/x/crisis"
 	crisiskeeper "github.com/cosmos/cosmos-sdk/x/crisis/keeper"
@@ -97,6 +96,7 @@ import (
 
 	evmkeeper "github.com/evmos/ethermint/x/evm/keeper"
 	evmtypes "github.com/evmos/ethermint/x/evm/types"
+	"github.com/evmos/ethermint/x/evm/vm/geth"
 	"github.com/evmos/ethermint/x/feemarket"
 	feemarketkeeper "github.com/evmos/ethermint/x/feemarket/keeper"
 	feemarkettypes "github.com/evmos/ethermint/x/feemarket/types"
@@ -387,7 +387,7 @@ func NewApp(
 
 	// Create Ethermint keepers
 	app.feeMarketKeeper = feemarketkeeper.NewKeeper(
-		appCodec, govAuthAddr, keys[feemarkettypes.StoreKey], tkeys[feemarkettypes.TransientKey], feemarketSubspace,
+		appCodec, govAuthAddr, runtime.NewKVStoreService(keys[feemarkettypes.StoreKey]), tkeys[feemarkettypes.TransientKey], feemarketSubspace,
 	)
 
 	app.evmutilKeeper = evmutilkeeper.NewKeeper(
@@ -400,9 +400,9 @@ func NewApp(
 
 	evmBankKeeper := evmutilkeeper.NewEvmBankKeeper(app.evmutilKeeper, app.bankKeeper, app.accountKeeper)
 	app.evmKeeper = evmkeeper.NewKeeper(
-		appCodec, keys[evmtypes.StoreKey], tkeys[evmtypes.TransientKey], govAuthAddr,
+		appCodec, runtime.NewKVStoreService(keys[evmtypes.StoreKey]), tkeys[evmtypes.TransientKey], govAuthAddr,
 		app.accountKeeper, evmBankKeeper, app.stakingKeeper, app.feeMarketKeeper,
-		vm.NewEVM, options.EVMTrace, evmSubspace,
+		nil, geth.NewEVM, options.EVMTrace, evmSubspace,
 	)
 
 	app.evmutilKeeper.SetEvmKeeper(app.evmKeeper)
@@ -476,7 +476,7 @@ func NewApp(
 		crisis.NewAppModule(app.crisisKeeper, options.SkipGenesisInvariants, crisisSubspace),
 		slashing.NewAppModule(appCodec, app.slashingKeeper, app.accountKeeper, app.bankKeeper, app.stakingKeeper, slashingSubspace, app.interfaceRegistry),
 		ibc.NewAppModule(app.ibcKeeper),
-		evm.NewAppModule(app.evmKeeper, app.accountKeeper),
+		evm.NewAppModule(app.evmKeeper, app.accountKeeper, evmSubspace),
 		feemarket.NewAppModule(app.feeMarketKeeper, feemarketSubspace),
 		upgrade.NewAppModule(app.upgradeKeeper, app.accountKeeper.AddressCodec()),
 		evidence.NewAppModule(*app.evidenceKeeper),
