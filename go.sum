@@ -930,8 +930,8 @@ github.com/openzipkin/zipkin-go v0.2.1/go.mod h1:NaW6tEwdmWMaCDZzg8sh+IBNOxHMPnh
 github.com/openzipkin/zipkin-go v0.2.2/go.mod h1:NaW6tEwdmWMaCDZzg8sh+IBNOxHMPnhQw8ySjnjRyN4=
 github.com/oraichain/cosmos-sdk v0.50.5-0.20240729032658-16fb0ec0a540 h1:eKScpVbDghsaMY/O7QrRZi1BvP6Q0JcQIJ367N0T2+A=
 github.com/oraichain/cosmos-sdk v0.50.5-0.20240729032658-16fb0ec0a540/go.mod h1:84xDDJEHttRT7NDGwBaUOLVOMN0JNE9x7NbsYIxXs1s=
-github.com/oraichain/ethermint-cosmos-0.50 v0.0.0-20240814071153-6d39239f429c h1:4CHEEXirL8aAg8DpWk4chHeDm1fMQ/4QKSies0Hss+M=
-github.com/oraichain/ethermint-cosmos-0.50 v0.0.0-20240814071153-6d39239f429c/go.mod h1:2CWzDnfgHTtGCjqB+s3DPKlTHKTj8BjXlVZ3lQLN7+A=
+github.com/oraichain/ethermint-cosmos-0.50 v0.0.0-20240814104954-26389a5cd24e h1:gzBLcTyy90Xt0UNbRv08JOvQoNCLZOjhFa8GP9AUM1g=
+github.com/oraichain/ethermint-cosmos-0.50 v0.0.0-20240814104954-26389a5cd24e/go.mod h1:2CWzDnfgHTtGCjqB+s3DPKlTHKTj8BjXlVZ3lQLN7+A=
 github.com/ory/dockertest v3.3.5+incompatible h1:iLLK6SQwIhcbrG783Dghaaa3WPzGc+4Emza6EbVUUGA=
 github.com/ory/dockertest v3.3.5+incompatible/go.mod h1:1vX4m9wsvi00u5bseYwXaSnhNrne+V0E6LAcBILJdPs=
 github.com/pact-foundation/pact-go v1.0.4/go.mod h1:uExwJY4kCzNPcHRj+hCR/HBbOOIwwtUjcrb0b5/5kLM=
