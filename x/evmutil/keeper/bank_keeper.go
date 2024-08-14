@@ -238,8 +238,12 @@ func (k EvmBankKeeper) SendCoins(ctx context.Context, fromAddr sdk.AccAddress, t
 	return k.bk.SendCoins(ctx, fromAddr, toAddr, amt)
 }
 
-func (k EvmBankKeeper) SpendableCoins(ctx context.Context, addr sdk.AccAddress) sdk.Coins {
+func (k EvmBankKeeper) SpendableCoins(ctx sdk.Context, addr sdk.AccAddress) sdk.Coins {
 	return k.bk.SpendableCoins(ctx, addr)
+}
+
+func (k EvmBankKeeper) SpendableCoin(ctx context.Context, addr sdk.AccAddress, denom string) sdk.Coin {
+	return k.bk.SpendableCoin(ctx, addr, denom)
 }
 
 // SplitAkavaCoins splits akava coins to the equivalent ukava coins and any remaining akava balance.

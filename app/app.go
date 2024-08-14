@@ -55,7 +55,7 @@ import (
 	"github.com/cosmos/ibc-go/modules/capability"
 	capabilitykeeper "github.com/cosmos/ibc-go/modules/capability/keeper"
 	capabilitytypes "github.com/cosmos/ibc-go/modules/capability/types"
-	"github.com/evmos/ethermint/x/evm/vm/geth"
+	"github.com/ethereum/go-ethereum/core/vm"
 
 	"github.com/cosmos/cosmos-sdk/x/crisis"
 	crisiskeeper "github.com/cosmos/cosmos-sdk/x/crisis/keeper"
@@ -249,6 +249,10 @@ func NewApp(
 	tkeys := storetypes.NewTransientStoreKeys(paramstypes.TStoreKey, evmtypes.TransientKey, feemarkettypes.TransientKey)
 	memKeys := storetypes.NewMemoryStoreKeys(capabilitytypes.MemStoreKey)
 
+	// Authority for gov proposals, using the x/gov module account address
+	govAuthAddr := authtypes.NewModuleAddress(govtypes.ModuleName)
+	govAuthAddrStr := govAuthAddr.String()
+
 	app := &App{
 		BaseApp:           bApp,
 		legacyAmino:       legacyAmino,
@@ -285,7 +289,7 @@ func NewApp(
 	app.consensusParamsKeeper = consensusparamkeeper.NewKeeper(
 		appCodec,
 		runtime.NewKVStoreService(keys[consensusparamtypes.StoreKey]),
-		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		govAuthAddrStr,
 		runtime.EventService{},
 	)
 	bApp.SetParamStore(app.consensusParamsKeeper.ParamsStore)
@@ -303,14 +307,14 @@ func NewApp(
 		mAccPerms,
 		authcodec.NewBech32Codec(sdk.GetConfig().GetBech32AccountAddrPrefix()),
 		sdk.GetConfig().GetBech32AccountAddrPrefix(),
-		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		govAuthAddrStr,
 	)
 	app.bankKeeper = bankkeeper.NewBaseKeeper(
 		appCodec,
 		runtime.NewKVStoreService(keys[banktypes.StoreKey]),
 		app.accountKeeper,
 		app.loadBlockedMaccAddrs(),
-		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		govAuthAddrStr,
 		logger,
 	)
 	app.stakingKeeper = stakingkeeper.NewKeeper(
@@ -318,7 +322,7 @@ func NewApp(
 		runtime.NewKVStoreService(keys[stakingtypes.StoreKey]),
 		app.accountKeeper,
 		app.bankKeeper,
-		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		govAuthAddrStr,
 		authcodec.NewBech32Codec(sdk.GetConfig().GetBech32ValidatorAddrPrefix()),
 		authcodec.NewBech32Codec(sdk.GetConfig().GetBech32ConsensusAddrPrefix()),
 	)
@@ -335,14 +339,14 @@ func NewApp(
 		app.bankKeeper,
 		app.stakingKeeper,
 		authtypes.FeeCollectorName,
-		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		govAuthAddrStr,
 	)
 	app.slashingKeeper = slashingkeeper.NewKeeper(
 		appCodec,
 		legacyAmino,
 		runtime.NewKVStoreService(keys[slashingtypes.StoreKey]),
 		app.stakingKeeper,
-		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		govAuthAddrStr,
 	)
 	app.crisisKeeper = crisiskeeper.NewKeeper(
 		appCodec,
@@ -350,7 +354,7 @@ func NewApp(
 		options.InvariantCheckPeriod,
 		app.bankKeeper,
 		authtypes.FeeCollectorName,
-		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		govAuthAddrStr,
 		app.accountKeeper.AddressCodec(),
 	)
 
@@ -360,7 +364,7 @@ func NewApp(
 		appCodec,
 		homePath,
 		app.BaseApp,
-		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		govAuthAddrStr,
 	)
 	app.evidenceKeeper = evidencekeeper.NewKeeper(
 		appCodec,
@@ -378,12 +382,12 @@ func NewApp(
 		app.stakingKeeper,
 		app.upgradeKeeper,
 		scopedIBCKeeper,
-		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		govAuthAddrStr,
 	)
 
 	// Create Ethermint keepers
 	app.feeMarketKeeper = feemarketkeeper.NewKeeper(
-		appCodec, authtypes.NewModuleAddress(govtypes.ModuleName), runtime.NewKVStoreService(keys[feemarkettypes.StoreKey]), tkeys[feemarkettypes.TransientKey], feemarketSubspace,
+		appCodec, govAuthAddr, keys[feemarkettypes.StoreKey], tkeys[feemarkettypes.TransientKey], feemarketSubspace,
 	)
 
 	app.evmutilKeeper = evmutilkeeper.NewKeeper(
@@ -396,9 +400,9 @@ func NewApp(
 
 	evmBankKeeper := evmutilkeeper.NewEvmBankKeeper(app.evmutilKeeper, app.bankKeeper, app.accountKeeper)
 	app.evmKeeper = evmkeeper.NewKeeper(
-		appCodec, runtime.NewKVStoreService(keys[evmtypes.StoreKey]), tkeys[evmtypes.TransientKey], authtypes.NewModuleAddress(govtypes.ModuleName),
+		appCodec, keys[evmtypes.StoreKey], tkeys[evmtypes.TransientKey], govAuthAddr,
 		app.accountKeeper, evmBankKeeper, app.stakingKeeper, app.feeMarketKeeper,
-		nil, geth.NewEVM, options.EVMTrace, evmSubspace,
+		vm.NewEVM, options.EVMTrace, evmSubspace,
 	)
 
 	app.evmutilKeeper.SetEvmKeeper(app.evmKeeper)
@@ -413,7 +417,7 @@ func NewApp(
 		app.accountKeeper,
 		app.bankKeeper,
 		scopedTransferKeeper,
-		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		govAuthAddrStr,
 	)
 	transferModule := transfer.NewAppModule(app.transferKeeper)
 	transferIBCModule := transfer.NewIBCModule(app.transferKeeper)
@@ -430,7 +434,7 @@ func NewApp(
 		app.accountKeeper,
 		app.bankKeeper,
 		authtypes.FeeCollectorName,
-		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		govAuthAddrStr,
 	)
 
 	// register the staking hooks
@@ -454,7 +458,7 @@ func NewApp(
 		app.distrKeeper,
 		app.MsgServiceRouter(),
 		govtypes.DefaultConfig(),
-		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		govAuthAddrStr,
 	)
 
 	// create the module manager (Note: Any module instantiated in the module manager that is later modified
@@ -472,7 +476,7 @@ func NewApp(
 		crisis.NewAppModule(app.crisisKeeper, options.SkipGenesisInvariants, crisisSubspace),
 		slashing.NewAppModule(appCodec, app.slashingKeeper, app.accountKeeper, app.bankKeeper, app.stakingKeeper, slashingSubspace, app.interfaceRegistry),
 		ibc.NewAppModule(app.ibcKeeper),
-		evm.NewAppModule(app.evmKeeper, app.accountKeeper, evmSubspace),
+		evm.NewAppModule(app.evmKeeper, app.accountKeeper),
 		feemarket.NewAppModule(app.feeMarketKeeper, feemarketSubspace),
 		upgrade.NewAppModule(app.upgradeKeeper, app.accountKeeper.AddressCodec()),
 		evidence.NewAppModule(*app.evidenceKeeper),

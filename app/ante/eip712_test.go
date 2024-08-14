@@ -86,7 +86,9 @@ func (suite *EIP712TestSuite) createTestEIP712CosmosTxBuilder(
 	accNumber := suite.tApp.GetAccountKeeper().GetAccount(suite.ctx, from).GetAccountNumber()
 
 	data := eip712.ConstructUntypedEIP712Data(chainId, accNumber, nonce, 0, fee, msgs, "")
-	typedData, err := eip712.WrapTxToTypedData(ethChainId, data)
+	typedData, err := eip712.WrapTxToTypedData(ethChainId, msgs, data, &eip712.FeeDelegationOptions{
+		FeePayer: from,
+	}, suite.tApp.GetEvmKeeper().GetParams(suite.ctx))
 	suite.Require().NoError(err)
 	sigHash, err := eip712.ComputeTypedDataHash(typedData)
 	suite.Require().NoError(err)
@@ -153,7 +155,7 @@ func (suite *EIP712TestSuite) SetupTest() {
 
 	// Genesis states
 	evmGs := evmtypes.NewGenesisState(
-		evmtypes.NewParams("akava", true, true, true, evmtypes.DefaultChainConfig(), nil),
+		evmtypes.NewParams("akava", true, true, true, evmtypes.DefaultChainConfig(), nil, nil, nil),
 		nil,
 	)
 
