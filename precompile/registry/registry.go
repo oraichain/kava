@@ -17,8 +17,8 @@ const (
 
 // init registers stateful precompile contracts with the global precompile registry
 // defined in kava-labs/go-ethereum/precompile/modules
-func InitializePrecompiles(wasmdKeeper pcommon.WasmdKeeper, evmKeeper pcommon.EVMKeeper) {
-	wasmdContract, err := wasmd.NewContract(wasmdKeeper, evmKeeper)
+func InitializePrecompiles(wasmdKeeper pcommon.WasmdKeeper, wasmdViewKeeper pcommon.WasmdViewKeeper, evmKeeper pcommon.EVMKeeper) {
+	wasmdContract, err := wasmd.NewContract(wasmdKeeper, wasmdViewKeeper, evmKeeper)
 	if err != nil {
 		panic(fmt.Errorf("error creating contract for address %s: %w", WasmdContractAddress, err))
 	}

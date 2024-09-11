@@ -25,8 +25,9 @@ var (
 )
 
 type PrecompileExecutor struct {
-	wasmdKeeper pcommon.WasmdKeeper
-	evmKeeper   pcommon.EVMKeeper
+	wasmdKeeper     pcommon.WasmdKeeper
+	wasmdViewKeeper pcommon.WasmdViewKeeper
+	evmKeeper       pcommon.EVMKeeper
 }
 
 func (p PrecompileExecutor) instantiateCosmWasm(
@@ -232,7 +233,7 @@ func (p PrecompileExecutor) queryCosmWasm(
 		return
 	}
 
-	queryRes, err := p.wasmdKeeper.QuerySmart(ctx, contractAddr, req)
+	queryRes, err := p.wasmdViewKeeper.QuerySmart(ctx, contractAddr, req)
 	if err != nil {
 		rerr = err
 		return
@@ -254,10 +255,12 @@ func (p PrecompileExecutor) queryCosmWasm(
 //	The functions of this contract (once implemented), will be used to exercise and test the various aspects of
 //	the EVM such as gas usage, argument parsing, events, etc. The specific operations tested under this contract are
 //	still to be determined.
-func NewContract(wasmdKeeper pcommon.WasmdKeeper, evmKeeper pcommon.EVMKeeper) (contract.StatefulPrecompiledContract, error) {
+func NewContract(wasmdKeeper pcommon.WasmdKeeper, wasmdViewKeeper pcommon.WasmdViewKeeper, evmKeeper pcommon.EVMKeeper) (contract.StatefulPrecompiledContract, error) {
 
 	executor := &PrecompileExecutor{
-		wasmdKeeper: wasmdKeeper,
+		wasmdKeeper:     wasmdKeeper,
+		wasmdViewKeeper: wasmdViewKeeper,
+		evmKeeper:       evmKeeper,
 	}
 
 	var functions []*contract.StatefulPrecompileFunction
