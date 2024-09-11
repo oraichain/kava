@@ -86,7 +86,7 @@ func TestExecute(t *testing.T) {
 	tApp.GetWasmKeeper().SetParams(ctx, wasmtypes.DefaultParams())
 	mockAddr, mockEVMAddr := MockAddressPair()
 	tApp.GetEvmKeeper().SetAddressMapping(ctx, mockAddr, mockEVMAddr)
-
+	sdk.RegisterDenom("ukava", sdk.NewDec(6))
 	amts := sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(1000)))
 	tApp.GetBankKeeper().MintCoins(ctx, evmtypes.ModuleName, amts)
 	tApp.GetBankKeeper().SendCoinsFromModuleToAccount(ctx, evmtypes.ModuleName, mockAddr, amts)
@@ -121,9 +121,8 @@ func TestExecute(t *testing.T) {
 		false,
 		nil,
 	)
-
-	t.Logf("res %v, gas %v", res, g)
-
 	require.Nil(t, err)
+	rets, _ := executeMethod.Outputs.Unpack(res)
+	t.Logf("res %s, gas remained %v", rets[0], g)
 
 }

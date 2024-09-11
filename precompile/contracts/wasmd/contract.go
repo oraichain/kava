@@ -85,8 +85,13 @@ func (p PrecompileExecutor) instantiateCosmWasm(
 		rerr = err
 		return
 	}
-	coinsValue := sdk.NewIntFromBigInt(value).Quo(pcommon.SdkOraiToSoraiMultiplier)
-	deposit := sdk.NewCoins(sdk.NewCoin(baseDenom, coinsValue))
+
+	var deposit sdk.Coins
+
+	if value != nil {
+		coinsValue := sdk.NewIntFromBigInt(value).Quo(pcommon.SdkOraiToSoraiMultiplier)
+		deposit = sdk.NewCoins(sdk.NewCoin(baseDenom, coinsValue))
+	}
 
 	adminAddr, err := sdk.AccAddressFromBech32(admin)
 	if err != nil {
@@ -157,8 +162,13 @@ func (p PrecompileExecutor) executeCosmWasm(
 		rerr = err
 		return
 	}
-	coinsValue := sdk.NewIntFromBigInt(value).Quo(pcommon.SdkOraiToSoraiMultiplier)
-	deposit := sdk.NewCoins(sdk.NewCoin(baseDenom, coinsValue))
+
+	var deposit sdk.Coins
+
+	if value != nil {
+		coinsValue := sdk.NewIntFromBigInt(value).Quo(pcommon.SdkOraiToSoraiMultiplier)
+		deposit = sdk.NewCoins(sdk.NewCoin(baseDenom, coinsValue))
+	}
 
 	// addresses will be sent in Cosmos format
 	contractAddr, err := sdk.AccAddressFromBech32(contractAddress)
@@ -266,17 +276,17 @@ func NewContract(wasmdKeeper pcommon.WasmdKeeper, wasmdViewKeeper pcommon.WasmdV
 	var functions []*contract.StatefulPrecompileFunction
 
 	functions = append(functions, contract.NewStatefulPrecompileFunction(
-		contract.MustCalculateFunctionSelector("instantiate(uint64,string,bytes,string,bytes)"),
+		IBCABI.Methods["instantiate"].ID,
 		executor.instantiateCosmWasm,
 	))
 
 	functions = append(functions, contract.NewStatefulPrecompileFunction(
-		contract.MustCalculateFunctionSelector("execute(string,bytes,bytes)"),
+		IBCABI.Methods["execute"].ID,
 		executor.executeCosmWasm,
 	))
 
 	functions = append(functions, contract.NewStatefulPrecompileFunction(
-		contract.MustCalculateFunctionSelector("query(string,bytes)"),
+		IBCABI.Methods["query"].ID,
 		executor.queryCosmWasm,
 	))
 
