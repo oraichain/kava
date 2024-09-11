@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/precompile/contract"
 	pcommon "github.com/kava-labs/kava/precompile/common"
+	"github.com/tharsis/ethermint/x/evm/statedb"
 )
 
 // Singleton StatefulPrecompiledContract.
@@ -67,7 +68,7 @@ func (p PrecompileExecutor) instantiateCosmWasm(
 	msg := *abi.ConvertType(res[2], new([]byte)).(*[]byte)
 	label := *abi.ConvertType(res[3], new(string)).(*string)
 
-	ctxer, ok := accessibleState.GetStateDB().(pcommon.Contexter)
+	ctxer, ok := accessibleState.GetStateDB().(*statedb.StateDB)
 	if !ok {
 		rerr = errors.New("cannot get context from EVM")
 		return
@@ -137,7 +138,7 @@ func (p PrecompileExecutor) executeCosmWasm(
 	contractAddress := *abi.ConvertType(res[0], new(string)).(*string)
 	msg := *abi.ConvertType(res[1], new([]byte)).(*[]byte)
 
-	ctxer, ok := accessibleState.GetStateDB().(pcommon.Contexter)
+	ctxer, ok := accessibleState.GetStateDB().(*statedb.StateDB)
 	if !ok {
 		rerr = errors.New("cannot get context from EVM")
 		return
@@ -210,7 +211,7 @@ func (p PrecompileExecutor) queryCosmWasm(
 	contractAddress := *abi.ConvertType(res[0], new(string)).(*string)
 	req := *abi.ConvertType(res[1], new([]byte)).(*[]byte)
 
-	ctxer, ok := accessibleState.GetStateDB().(pcommon.Contexter)
+	ctxer, ok := accessibleState.GetStateDB().(*statedb.StateDB)
 	if !ok {
 		rerr = errors.New("cannot get context from EVM")
 		return

@@ -5,10 +5,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-type Contexter interface {
-	Ctx() sdk.Context
-}
-
 type EVMKeeper interface {
 	GetCosmosAddressMapping(ctx sdk.Context, evmAddress common.Address) sdk.AccAddress
 }
