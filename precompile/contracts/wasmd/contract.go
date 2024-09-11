@@ -84,13 +84,11 @@ func (p PrecompileExecutor) instantiateCosmWasm(
 	coinsValue := sdk.NewIntFromBigInt(value).Quo(pcommon.SdkOraiToSoraiMultiplier)
 	deposit := sdk.NewCoins(sdk.NewCoin(baseDenom, coinsValue))
 
-	var adminAddr sdk.AccAddress
-	adminAddrDecoded, err := sdk.AccAddressFromBech32(admin)
+	adminAddr, err := sdk.AccAddressFromBech32(admin)
 	if err != nil {
 		rerr = err
 		return
 	}
-	adminAddr = adminAddrDecoded
 
 	addr, data, err := p.wasmdKeeper.Instantiate(ctx, codeID, creator, adminAddr, msg, label, deposit)
 	if err != nil {
