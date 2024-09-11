@@ -57,7 +57,9 @@ func (p PrecompileExecutor) instantiateCosmWasm(
 		return
 	}
 
-	res, err := IBCABI.UnpackInput("instantiate", packedInput)
+	method := IBCABI.Methods["instantiate"]
+
+	res, err := method.Inputs.Unpack(packedInput)
 	if err != nil {
 		rerr = err
 		return
@@ -99,7 +101,7 @@ func (p PrecompileExecutor) instantiateCosmWasm(
 
 	cosmosGasUsed := ctx.GasMeter().GasConsumed()
 
-	ret, rerr = IBCABI.Pack("instantiate", addr.String(), data)
+	ret, rerr = method.Outputs.Pack(addr.String(), data)
 
 	remainingGas, rerr = contract.DeductGas(suppliedGas, cosmosGasUsed)
 
@@ -129,7 +131,9 @@ func (p PrecompileExecutor) executeCosmWasm(
 		return
 	}
 
-	res, err := IBCABI.UnpackInput("execute", packedInput)
+	method := IBCABI.Methods["execute"]
+
+	res, err := method.Inputs.Unpack(packedInput)
 	if err != nil {
 		rerr = err
 		return
@@ -171,7 +175,7 @@ func (p PrecompileExecutor) executeCosmWasm(
 
 	cosmosGasUsed := ctx.GasMeter().GasConsumed()
 
-	ret, rerr = IBCABI.Pack("execute", exeRes)
+	ret, rerr = method.Outputs.Pack(exeRes)
 
 	remainingGas, rerr = contract.DeductGas(suppliedGas, cosmosGasUsed)
 
@@ -197,12 +201,15 @@ func (p PrecompileExecutor) queryCosmWasm(
 			return
 		}
 	}()
+
 	if value != nil && value.Sign() != 0 {
 		rerr = errors.New("sending funds to a non-payable function")
 		return
 	}
 
-	res, err := IBCABI.UnpackInput("query", packedInput)
+	method := IBCABI.Methods["query"]
+
+	res, err := method.Inputs.Unpack(packedInput)
 	if err != nil {
 		rerr = err
 		return
@@ -233,7 +240,7 @@ func (p PrecompileExecutor) queryCosmWasm(
 
 	cosmosGasUsed := ctx.GasMeter().GasConsumed()
 
-	ret, rerr = IBCABI.Pack("query", queryRes)
+	ret, rerr = method.Outputs.Pack(queryRes)
 
 	remainingGas, rerr = contract.DeductGas(suppliedGas, cosmosGasUsed)
 
