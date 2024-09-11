@@ -1,12 +1,28 @@
 package wasmd_test
 
 import (
+	"encoding/hex"
+	"os"
 	"testing"
+	"time"
 
+	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
+	"github.com/cosmos/cosmos-sdk/crypto/hd"
+	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/go-bip39"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/precompile/modules"
+	"github.com/kava-labs/kava/app"
 	"github.com/kava-labs/kava/precompile/contracts/wasmd"
+	"github.com/kava-labs/kava/precompile/registry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	tmtypes "github.com/tendermint/tendermint/proto/tendermint/types"
+	"github.com/tharsis/ethermint/x/evm/statedb"
+	evmtypes "github.com/tharsis/ethermint/x/evm/types"
 )
 
 type MockWasmer struct {
@@ -25,6 +41,35 @@ func (m *MockWasmer) QuerySmart(ctx sdk.Context, contractAddr sdk.AccAddress, re
 	return []byte("QuerySmart"), nil
 }
 
+func MockAddressPair() (sdk.AccAddress, common.Address) {
+	return PrivateKeyToAddresses(MockPrivateKey())
+}
+
+func MockPrivateKey() cryptotypes.PrivKey {
+	// Generate a new Sei private key
+	entropySeed, _ := bip39.NewEntropy(256)
+	mnemonic, _ := bip39.NewMnemonic(entropySeed)
+	algo := hd.Secp256k1
+	derivedPriv, _ := algo.Derive()(mnemonic, "", "")
+	return algo.Generate()(derivedPriv)
+}
+
+func PrivateKeyToAddresses(privKey cryptotypes.PrivKey) (sdk.AccAddress, common.Address) {
+	// Encode the private key to hex (i.e. what wallets do behind the scene when users reveal private keys)
+	testPrivHex := hex.EncodeToString(privKey.Bytes())
+
+	// Sign an Ethereum transaction with the hex private key
+	key, _ := crypto.HexToECDSA(testPrivHex)
+	msg := crypto.Keccak256([]byte("foo"))
+	sig, _ := crypto.Sign(msg, key)
+
+	// Recover the public keys from the Ethereum signature
+	recoveredPub, _ := crypto.Ecrecover(msg, sig)
+	pubKey, _ := crypto.UnmarshalPubkey(recoveredPub)
+
+	return sdk.AccAddress(privKey.PubKey().Address()), crypto.PubkeyToAddress(*pubKey)
+}
+
 // TestContractConstructor ensures we have a valid constructor. This will fail
 // if we attempt to define invalid or duplicate function selectors.
 func TestContractConstructor(t *testing.T) {
@@ -32,4 +77,53 @@ func TestContractConstructor(t *testing.T) {
 	precompile, err := wasmd.NewContract(wasmer, wasmer, nil)
 	require.NoError(t, err, "expected precompile not error when created")
 	assert.NotNil(t, precompile, "expected precompile contract to be defined")
+}
+
+func TestExecute(t *testing.T) {
+
+	tApp := app.NewTestApp()
+	ctx := tApp.NewContext(true, tmtypes.Header{Height: 1, ChainID: "kava-test", Time: time.Now().UTC()})
+	tApp.GetWasmKeeper().SetParams(ctx, wasmtypes.DefaultParams())
+	mockAddr, mockEVMAddr := MockAddressPair()
+	tApp.GetEvmKeeper().SetAddressMapping(ctx, mockAddr, mockEVMAddr)
+
+	amts := sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(1000)))
+	tApp.GetBankKeeper().MintCoins(ctx, evmtypes.ModuleName, amts)
+	tApp.GetBankKeeper().SendCoinsFromModuleToAccount(ctx, evmtypes.ModuleName, mockAddr, amts)
+
+	println("acc addr", mockAddr.String())
+
+	code, err := os.ReadFile("../../cosmwasm/echo/artifacts/echo.wasm")
+	require.Nil(t, err)
+	codeID, _, err := tApp.GetContractKeeper().Create(ctx, mockAddr, code, nil)
+	require.Nil(t, err)
+
+	cosmwasmAddr, _, err := tApp.GetContractKeeper().Instantiate(ctx, codeID, mockAddr, mockAddr, []byte("{}"), "test", nil)
+	require.Nil(t, err)
+
+	println("cosmwasm addr", cosmwasmAddr.String())
+
+	contractAddress := common.HexToAddress(registry.WasmdContractAddress)
+	p, _ := modules.GetPrecompileModuleByAddress(contractAddress)
+
+	evm := vm.EVM{
+		StateDB: statedb.New(ctx, tApp.GetEvmKeeper(), statedb.NewEmptyTxConfig(common.BytesToHash(ctx.HeaderHash().Bytes()))),
+	}
+	suppliedGas := uint64(1000000)
+	executeMethod := wasmd.IBCABI.Methods["execute"]
+
+	args, err := executeMethod.Inputs.Pack(cosmwasmAddr.String(), []byte("{\"echo\":{\"message\":\"test msg\"}}"))
+	require.Nil(t, err)
+
+	res, g, err := p.Contract.Run(&evm, mockEVMAddr, contractAddress,
+		append(executeMethod.ID, args...),
+		suppliedGas,
+		false,
+		nil,
+	)
+
+	t.Logf("res %v, gas %v", res, g)
+
+	require.Nil(t, err)
+
 }
