@@ -17,7 +17,7 @@ import (
 //     expected length, not missing 0's, etc.
 func TestRegisteredPrecompilesAddresses(t *testing.T) {
 
-	registry.InitializePrecompiles(nil)
+	registry.InitializePrecompiles(nil, nil)
 
 	// build list of 0x addresses that are registered
 	registeredModules := modules.RegisteredModules()

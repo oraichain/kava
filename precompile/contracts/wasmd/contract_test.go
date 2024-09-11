@@ -29,7 +29,7 @@ func (m *MockWasmer) QuerySmart(ctx sdk.Context, contractAddr sdk.AccAddress, re
 // if we attempt to define invalid or duplicate function selectors.
 func TestContractConstructor(t *testing.T) {
 	wasmer := &MockWasmer{}
-	precompile, err := wasmd.NewContract(wasmer)
+	precompile, err := wasmd.NewContract(wasmer, nil)
 	require.NoError(t, err, "expected precompile not error when created")
 	assert.NotNil(t, precompile, "expected precompile contract to be defined")
 }

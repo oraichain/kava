@@ -101,7 +101,10 @@ func addSubCmds(rootCmd *cobra.Command, encodingConfig params.EncodingConfig, de
 	}
 
 	// ethermintserver adds additional flags to start the JSON-RPC server for evm support
-	ethermintserver.AddCommands(rootCmd, defaultNodeHome, ac.newApp, ac.appExport, ac.addStartCmdFlags)
+	ethermintserver.AddCommands(rootCmd, ethermintserver.StartOptions{
+		DefaultNodeHome: defaultNodeHome,
+		AppCreator:      ac.newApp,
+	}, ac.appExport, ac.addStartCmdFlags)
 
 	// add keybase, auxiliary RPC, query, and tx child commands
 	rootCmd.AddCommand(
