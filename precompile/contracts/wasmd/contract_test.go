@@ -110,7 +110,7 @@ func TestExecute(t *testing.T) {
 		StateDB: statedb.New(ctx, tApp.GetEvmKeeper(), statedb.NewEmptyTxConfig(common.BytesToHash(ctx.HeaderHash().Bytes()))),
 	}
 	suppliedGas := uint64(1000000)
-	executeMethod := wasmd.IBCABI.Methods["execute"]
+	executeMethod := wasmd.ABI.Methods["execute"]
 
 	args, err := executeMethod.Inputs.Pack(cosmwasmAddr.String(), []byte("{\"echo\":{\"message\":\"test msg\"}}"))
 	require.Nil(t, err)

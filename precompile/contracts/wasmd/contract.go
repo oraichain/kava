@@ -17,11 +17,11 @@ import (
 
 // Singleton StatefulPrecompiledContract.
 var (
-	// IBCRawABI contains the raw ABI of IBC contract.
+	// RawABI contains the raw ABI of wasmd contract.
 	//go:embed abi.json
-	IBCRawABI string
+	RawABI string
 
-	IBCABI = contract.MustParseABI(IBCRawABI)
+	ABI = contract.MustParseABI(RawABI)
 )
 
 type PrecompileExecutor struct {
@@ -58,7 +58,7 @@ func (p PrecompileExecutor) instantiateCosmWasm(
 		return
 	}
 
-	method := IBCABI.Methods["instantiate"]
+	method := ABI.Methods["instantiate"]
 
 	res, err := method.Inputs.Unpack(packedInput)
 	if err != nil {
@@ -137,7 +137,7 @@ func (p PrecompileExecutor) executeCosmWasm(
 		return
 	}
 
-	method := IBCABI.Methods["execute"]
+	method := ABI.Methods["execute"]
 
 	res, err := method.Inputs.Unpack(packedInput)
 	if err != nil {
@@ -218,7 +218,7 @@ func (p PrecompileExecutor) queryCosmWasm(
 		return
 	}
 
-	method := IBCABI.Methods["query"]
+	method := ABI.Methods["query"]
 
 	res, err := method.Inputs.Unpack(packedInput)
 	if err != nil {
@@ -276,17 +276,17 @@ func NewContract(wasmdKeeper pcommon.WasmdKeeper, wasmdViewKeeper pcommon.WasmdV
 	var functions []*contract.StatefulPrecompileFunction
 
 	functions = append(functions, contract.NewStatefulPrecompileFunction(
-		IBCABI.Methods["instantiate"].ID,
+		ABI.Methods["instantiate"].ID,
 		executor.instantiateCosmWasm,
 	))
 
 	functions = append(functions, contract.NewStatefulPrecompileFunction(
-		IBCABI.Methods["execute"].ID,
+		ABI.Methods["execute"].ID,
 		executor.executeCosmWasm,
 	))
 
 	functions = append(functions, contract.NewStatefulPrecompileFunction(
-		IBCABI.Methods["query"].ID,
+		ABI.Methods["query"].ID,
 		executor.queryCosmWasm,
 	))
 
