@@ -3,7 +3,6 @@ package wasmd
 import (
 	"bytes"
 	_ "embed"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -67,7 +66,6 @@ func (p PrecompileExecutor) instantiateCosmWasm(
 	admin := *abi.ConvertType(res[1], new(string)).(*string)
 	msg := *abi.ConvertType(res[2], new([]byte)).(*[]byte)
 	label := *abi.ConvertType(res[3], new(string)).(*string)
-	coinsBz := *abi.ConvertType(res[4], new([]byte)).(*[]byte)
 
 	ctxer, ok := accessibleState.GetStateDB().(pcommon.Contexter)
 	if !ok {
@@ -78,22 +76,13 @@ func (p PrecompileExecutor) instantiateCosmWasm(
 
 	creator := p.evmKeeper.GetCosmosAddressMapping(ctx, caller)
 
-	deposit := sdk.NewCoins()
-	if err := json.Unmarshal(coinsBz, &deposit); err != nil {
-		rerr = err
-		return
-	}
-
 	baseDenom, err := sdk.GetBaseDenom()
 	if err != nil {
 		rerr = err
 		return
 	}
-	coinsValue := deposit.AmountOf(baseDenom).Mul(pcommon.SdkOraiToSoraiMultiplier).BigInt()
-	if (value == nil && coinsValue.Sign() == 1) || (value != nil && coinsValue.Cmp(value) != 0) {
-		rerr = errors.New("coin amount must equal value specified")
-		return
-	}
+	coinsValue := sdk.NewIntFromBigInt(value).Quo(pcommon.SdkOraiToSoraiMultiplier)
+	deposit := sdk.NewCoins(sdk.NewCoin(baseDenom, coinsValue))
 
 	var adminAddr sdk.AccAddress
 	adminAddrDecoded, err := sdk.AccAddressFromBech32(admin)
@@ -149,7 +138,6 @@ func (p PrecompileExecutor) executeCosmWasm(
 
 	contractAddress := *abi.ConvertType(res[0], new(string)).(*string)
 	msg := *abi.ConvertType(res[1], new([]byte)).(*[]byte)
-	coins := *abi.ConvertType(res[2], new([]byte)).(*[]byte)
 
 	ctxer, ok := accessibleState.GetStateDB().(pcommon.Contexter)
 	if !ok {
@@ -160,24 +148,15 @@ func (p PrecompileExecutor) executeCosmWasm(
 
 	senderAddr := p.evmKeeper.GetCosmosAddressMapping(ctx, caller)
 
-	deposit := sdk.NewCoins()
-	if err := json.Unmarshal(coins, &deposit); err != nil {
-		rerr = err
-		return
-	}
-
 	baseDenom, err := sdk.GetBaseDenom()
 	if err != nil {
 		rerr = err
 		return
 	}
-	coinsValue := deposit.AmountOf(baseDenom).Mul(pcommon.SdkOraiToSoraiMultiplier).BigInt()
-	if (value == nil && coinsValue.Sign() == 1) || (value != nil && coinsValue.Cmp(value) != 0) {
-		rerr = errors.New("coin amount must equal value specified")
-		return
-	}
+	coinsValue := sdk.NewIntFromBigInt(value).Quo(pcommon.SdkOraiToSoraiMultiplier)
+	deposit := sdk.NewCoins(sdk.NewCoin(baseDenom, coinsValue))
 
-	// addresses will be sent in Sei format
+	// addresses will be sent in Cosmos format
 	contractAddr, err := sdk.AccAddressFromBech32(contractAddress)
 	if err != nil {
 		rerr = err
@@ -240,7 +219,7 @@ func (p PrecompileExecutor) queryCosmWasm(
 	}
 	ctx := ctxer.Ctx()
 
-	// addresses will be sent in Sei format
+	// addresses will be sent in Cosmos format
 	contractAddr, err := sdk.AccAddressFromBech32(contractAddress)
 	if err != nil {
 		rerr = err
