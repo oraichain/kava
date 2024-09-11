@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/precompile/modules"
+	"github.com/kava-labs/kava/precompile/registry"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -15,6 +16,9 @@ import (
 //     then back to 0x encoded string, we can be certain that the string defined in the module is the
 //     expected length, not missing 0's, etc.
 func TestRegisteredPrecompilesAddresses(t *testing.T) {
+
+	registry.InitializePrecompiles(nil)
+
 	// build list of 0x addresses that are registered
 	registeredModules := modules.RegisteredModules()
 	registeredPrecompiles := make([]string, 0, len(registeredModules))
