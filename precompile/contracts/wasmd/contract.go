@@ -8,7 +8,6 @@ import (
 	"math/big"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/precompile/contract"
 	pcommon "github.com/kava-labs/kava/precompile/common"
@@ -66,10 +65,10 @@ func (p PrecompileExecutor) instantiateCosmWasm(
 		return
 	}
 
-	codeID := *abi.ConvertType(res[0], new(uint64)).(*uint64)
-	admin := *abi.ConvertType(res[1], new(string)).(*string)
-	msg := *abi.ConvertType(res[2], new([]byte)).(*[]byte)
-	label := *abi.ConvertType(res[3], new(string)).(*string)
+	codeID := res[0].(uint64)
+	admin := res[1].(string)
+	msg := res[2].([]byte)
+	label := res[3].(string)
 
 	ctxer, ok := accessibleState.GetStateDB().(*statedb.StateDB)
 	if !ok {
@@ -145,8 +144,8 @@ func (p PrecompileExecutor) executeCosmWasm(
 		return
 	}
 
-	contractAddress := *abi.ConvertType(res[0], new(string)).(*string)
-	msg := *abi.ConvertType(res[1], new([]byte)).(*[]byte)
+	contractAddress := res[0].(string)
+	msg := res[1].([]byte)
 
 	ctxer, ok := accessibleState.GetStateDB().(*statedb.StateDB)
 	if !ok {
@@ -226,8 +225,8 @@ func (p PrecompileExecutor) queryCosmWasm(
 		return
 	}
 
-	contractAddress := *abi.ConvertType(res[0], new(string)).(*string)
-	req := *abi.ConvertType(res[1], new([]byte)).(*[]byte)
+	contractAddress := res[0].(string)
+	req := res[1].([]byte)
 
 	ctxer, ok := accessibleState.GetStateDB().(*statedb.StateDB)
 	if !ok {

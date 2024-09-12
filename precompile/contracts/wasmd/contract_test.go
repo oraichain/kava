@@ -98,30 +98,40 @@ func TestExecute(t *testing.T) {
 	codeID, _, err := tApp.GetContractKeeper().Create(ctx, mockAddr, code, nil)
 	require.Nil(t, err)
 
-	cosmwasmAddr, _, err := tApp.GetContractKeeper().Instantiate(ctx, codeID, mockAddr, mockAddr, []byte("{}"), "test", nil)
-	require.Nil(t, err)
-
-	println("cosmwasm addr", cosmwasmAddr.String())
-
 	p, _ := modules.GetPrecompileModuleByAddress(registry.WasmdContractAddress)
 
 	evm := vm.EVM{
 		StateDB: statedb.New(ctx, tApp.GetEvmKeeper(), statedb.NewEmptyTxConfig(common.BytesToHash(ctx.HeaderHash().Bytes()))),
 	}
-	suppliedGas := uint64(1000000)
-	executeMethod := wasmd.ABI.Methods["execute"]
+	suppliedGas := uint64(10_000_000)
 
-	args, err := executeMethod.Inputs.Pack(cosmwasmAddr.String(), []byte("{\"echo\":{\"message\":\"test msg\"}}"))
+	instantiateMethod := wasmd.ABI.Methods["instantiate"]
+
+	args, err := instantiateMethod.Inputs.Pack(codeID, mockAddr.String(), []byte("{}"), "test")
+	require.Nil(t, err)
+	res, suppliedGas, err := p.Contract.Run(&evm, registry.WasmdContractAddress, registry.WasmdContractAddress,
+		append(instantiateMethod.ID, args...),
+		suppliedGas,
+		false,
+		nil,
+	)
+	require.Nil(t, err)
+	rets, _ := instantiateMethod.Outputs.Unpack(res)
+	cosmwasmAddr := rets[0].(string)
+
+	executeMethod := wasmd.ABI.Methods["execute"]
+	args, err = executeMethod.Inputs.Pack(cosmwasmAddr, []byte("{\"echo\":{\"message\":\"test msg\"}}"))
 	require.Nil(t, err)
 
-	res, g, err := p.Contract.Run(&evm, mockEVMAddr, registry.WasmdContractAddress,
+	res, suppliedGas, err = p.Contract.Run(&evm, mockEVMAddr, registry.WasmdContractAddress,
 		append(executeMethod.ID, args...),
 		suppliedGas,
 		false,
 		nil,
 	)
 	require.Nil(t, err)
-	rets, _ := executeMethod.Outputs.Unpack(res)
-	t.Logf("res %s, gas remained %v", rets[0], g)
+	rets, _ = executeMethod.Outputs.Unpack(res)
+	response := rets[0].([]byte)
+	t.Logf("res %s, gas remained %v", response, suppliedGas)
 
 }
