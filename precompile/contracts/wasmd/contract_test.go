@@ -103,8 +103,7 @@ func TestExecute(t *testing.T) {
 
 	println("cosmwasm addr", cosmwasmAddr.String())
 
-	contractAddress := common.HexToAddress(registry.WasmdContractAddress)
-	p, _ := modules.GetPrecompileModuleByAddress(contractAddress)
+	p, _ := modules.GetPrecompileModuleByAddress(registry.WasmdContractAddress)
 
 	evm := vm.EVM{
 		StateDB: statedb.New(ctx, tApp.GetEvmKeeper(), statedb.NewEmptyTxConfig(common.BytesToHash(ctx.HeaderHash().Bytes()))),
@@ -115,7 +114,7 @@ func TestExecute(t *testing.T) {
 	args, err := executeMethod.Inputs.Pack(cosmwasmAddr.String(), []byte("{\"echo\":{\"message\":\"test msg\"}}"))
 	require.Nil(t, err)
 
-	res, g, err := p.Contract.Run(&evm, mockEVMAddr, contractAddress,
+	res, g, err := p.Contract.Run(&evm, mockEVMAddr, registry.WasmdContractAddress,
 		append(executeMethod.ID, args...),
 		suppliedGas,
 		false,

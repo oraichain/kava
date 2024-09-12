@@ -10,9 +10,9 @@ import (
 	"github.com/kava-labs/kava/precompile/contracts/wasmd"
 )
 
-const (
+var (
 	// WasmdContractAddress the primary noop contract address for testing
-	WasmdContractAddress = "0x9000000000000000000000000000000000000001"
+	WasmdContractAddress = common.HexToAddress("0x9000000000000000000000000000000000000001")
 )
 
 // init registers stateful precompile contracts with the global precompile registry
@@ -22,6 +22,7 @@ func InitializePrecompiles(wasmdKeeper pcommon.WasmdKeeper, wasmdViewKeeper pcom
 	if err != nil {
 		panic(fmt.Errorf("error creating contract for address %s: %w", WasmdContractAddress, err))
 	}
+
 	register(WasmdContractAddress, wasmdContract)
 }
 
@@ -29,14 +30,20 @@ func InitializePrecompiles(wasmdKeeper pcommon.WasmdKeeper, wasmdViewKeeper pcom
 // precompile contract via the constructor, and registers it with the precompile module registry.
 //
 // This panics if the contract can not be created or the module can not be registered
-func register(address string, contract contract.StatefulPrecompiledContract) {
+func register(moduleAddress common.Address, contract contract.StatefulPrecompiledContract) {
+
+	// if already found then return
+	_, found := modules.GetPrecompileModuleByAddress(moduleAddress)
+
+	if found {
+		return
+	}
+
 	module := modules.Module{
-		Address:  common.HexToAddress(address),
+		Address:  moduleAddress,
 		Contract: contract,
 	}
 
-	err := modules.RegisterModule(module)
-	if err != nil {
-		panic(fmt.Errorf("error registering contract module for address %s: %w", address, err))
-	}
+	modules.RegisterModule(module)
+
 }
