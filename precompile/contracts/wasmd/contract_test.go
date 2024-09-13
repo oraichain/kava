@@ -162,4 +162,7 @@ func TestExecute(t *testing.T) {
 	response := rets[0].([]byte)
 	t.Logf("res %s, gas remained %v", response, suppliedGas)
 
+	// check balance after sent funds. Should drop
+	balanceAfterExecute := tApp.GetBankKeeper().GetBalance(ctx, mockAddr, "ukava")
+	require.Equal(t, balanceAfterExecute, amts[0].Sub(funds[0]))
 }
