@@ -3,6 +3,7 @@ package wasmd
 import (
 	"bytes"
 	_ "embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -69,6 +70,10 @@ func (p PrecompileExecutor) instantiateCosmWasm(
 	admin := res[1].(string)
 	msg := res[2].([]byte)
 	label := res[3].(string)
+	funds := res[4].([]byte)
+
+	// unmarshal funds
+	deposit := UnmarshalCosmWasmDeposit(funds)
 
 	ctxer, ok := accessibleState.GetStateDB().(*statedb.StateDB)
 	if !ok {
@@ -78,19 +83,6 @@ func (p PrecompileExecutor) instantiateCosmWasm(
 	ctx := ctxer.Ctx()
 
 	creator := p.evmKeeper.GetCosmosAddressMapping(ctx, caller)
-
-	baseDenom, err := sdk.GetBaseDenom()
-	if err != nil {
-		rerr = err
-		return
-	}
-
-	var deposit sdk.Coins
-
-	if value != nil {
-		coinsValue := sdk.NewIntFromBigInt(value).Quo(pcommon.SdkOraiToSoraiMultiplier)
-		deposit = sdk.NewCoins(sdk.NewCoin(baseDenom, coinsValue))
-	}
 
 	adminAddr, err := sdk.AccAddressFromBech32(admin)
 	if err != nil {
@@ -146,6 +138,10 @@ func (p PrecompileExecutor) executeCosmWasm(
 
 	contractAddress := res[0].(string)
 	msg := res[1].([]byte)
+	funds := res[2].([]byte)
+
+	// unmarshal funds
+	deposit := UnmarshalCosmWasmDeposit(funds)
 
 	ctxer, ok := accessibleState.GetStateDB().(*statedb.StateDB)
 	if !ok {
@@ -155,19 +151,6 @@ func (p PrecompileExecutor) executeCosmWasm(
 	ctx := ctxer.Ctx()
 
 	senderAddr := p.evmKeeper.GetCosmosAddressMapping(ctx, caller)
-
-	baseDenom, err := sdk.GetBaseDenom()
-	if err != nil {
-		rerr = err
-		return
-	}
-
-	var deposit sdk.Coins
-
-	if value != nil {
-		coinsValue := sdk.NewIntFromBigInt(value).Quo(pcommon.SdkOraiToSoraiMultiplier)
-		deposit = sdk.NewCoins(sdk.NewCoin(baseDenom, coinsValue))
-	}
 
 	// addresses will be sent in Cosmos format
 	contractAddr, err := sdk.AccAddressFromBech32(contractAddress)
@@ -297,4 +280,14 @@ func NewContract(wasmdKeeper pcommon.WasmdKeeper, wasmdViewKeeper pcommon.WasmdV
 	}
 
 	return precompile, nil
+}
+
+func UnmarshalCosmWasmDeposit(coins []byte) sdk.Coins {
+	// unmarshal coins
+	var deposit sdk.Coins
+	err := json.Unmarshal(coins, &deposit)
+	if err != nil {
+		return sdk.NewCoins()
+	}
+	return deposit
 }
