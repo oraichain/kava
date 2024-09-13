@@ -10,8 +10,8 @@ import (
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
-	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/cosmos/go-bip39"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -80,16 +80,9 @@ func TestUnmarshalCosmWasmDeposit(t *testing.T) {
 	deposit = wasmd.UnmarshalCosmWasmDeposit([]byte("{}"))
 	require.Equal(t, deposit, sdk.NewCoins())
 	deposit = wasmd.UnmarshalCosmWasmDeposit([]byte("[{\"denom\":\"ukava\",\"amount\":\"10\"}, {\"denom\":\"orai\",\"amount\":\"100\"}]"))
-	coins := sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(10)), sdk.NewCoin("orai", sdk.NewInt(100)))
-	for _, coin := range coins {
-		if coin.Denom == "orai" {
-			require.Equal(t, coin.Amount, sdk.NewInt(100))
-		} else if coin.Denom == "ukava" {
-			require.Equal(t, coin.Amount, sdk.NewInt(10))
-		} else {
-			panic("Wrong Unmarshal")
-		}
-	}
+	coins := sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(10)), sdk.NewCoin("orai", sdk.NewInt(100))).Sort()
+
+	require.Equal(t, coins, deposit)
 }
 
 // TestContractConstructor ensures we have a valid constructor. This will fail

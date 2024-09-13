@@ -289,5 +289,5 @@ func UnmarshalCosmWasmDeposit(coins []byte) sdk.Coins {
 	if err != nil {
 		return sdk.NewCoins()
 	}
-	return deposit
+	return deposit.Sort()
 }
