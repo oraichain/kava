@@ -1,6 +1,7 @@
 package wasmd_test
 
 import (
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"os"
@@ -10,8 +11,8 @@ import (
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
-	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/cosmos/go-bip39"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -165,4 +166,62 @@ func TestExecute(t *testing.T) {
 	// check balance after sent funds. Should drop
 	balanceAfterExecute := tApp.GetBankKeeper().GetBalance(ctx, mockAddr, "ukava")
 	require.Equal(t, balanceAfterExecute, amts[0].Sub(funds[0]))
+}
+
+func TestQuery(t *testing.T) {
+
+	tApp := app.NewTestApp()
+	ctx := tApp.NewContext(true, tmtypes.Header{Height: 1, ChainID: "kava-test", Time: time.Now().UTC()})
+	tApp.GetWasmKeeper().SetParams(ctx, wasmtypes.DefaultParams())
+	mockAddr, mockEVMAddr := MockAddressPair()
+	tApp.GetEvmKeeper().SetAddressMapping(ctx, mockAddr, mockEVMAddr)
+	sdk.RegisterDenom("ukava", sdk.NewDec(6))
+	amts := sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(1000)))
+	tApp.GetBankKeeper().MintCoins(ctx, evmtypes.ModuleName, amts)
+	tApp.GetBankKeeper().SendCoinsFromModuleToAccount(ctx, evmtypes.ModuleName, mockAddr, amts)
+	tApp.GetBankKeeper().SetParams(ctx, banktypes.DefaultParams())
+
+	println("acc addr", mockAddr.String())
+
+	code, err := os.ReadFile("../../cosmwasm/echo/artifacts/echo.wasm")
+	require.Nil(t, err)
+	codeID, _, err := tApp.GetContractKeeper().Create(ctx, mockAddr, code, nil)
+	require.Nil(t, err)
+
+	p, _ := modules.GetPrecompileModuleByAddress(registry.WasmdContractAddress)
+
+	evm := vm.EVM{
+		StateDB: statedb.New(ctx, tApp.GetEvmKeeper(), statedb.NewEmptyTxConfig(common.BytesToHash(ctx.HeaderHash().Bytes()))),
+	}
+	suppliedGas := uint64(10_000_000)
+
+	instantiateMethod := wasmd.ABI.Methods["instantiate"]
+
+	args, err := instantiateMethod.Inputs.Pack(codeID, mockAddr.String(), []byte("{}"), "test", []byte("foo"))
+	require.Nil(t, err)
+	res, suppliedGas, err := p.Contract.Run(&evm, registry.WasmdContractAddress, registry.WasmdContractAddress,
+		append(instantiateMethod.ID, args...),
+		suppliedGas,
+		false,
+		nil,
+	)
+	require.Nil(t, err)
+	rets, _ := instantiateMethod.Outputs.Unpack(res)
+	cosmwasmAddr := rets[0].(string)
+
+	queryMethod := wasmd.ABI.Methods["query"]
+
+	args, err = queryMethod.Inputs.Pack(cosmwasmAddr, []byte("{\"info\":{}}"))
+	require.Nil(t, err)
+
+	res, suppliedGas, err = p.Contract.Run(&evm, mockEVMAddr, registry.WasmdContractAddress,
+		append(queryMethod.ID, args...),
+		suppliedGas,
+		false,
+		nil,
+	)
+	require.Nil(t, err)
+	rets, _ = queryMethod.Outputs.Unpack(res)
+	response := rets[0].([]byte)
+	require.Equal(t, base64.StdEncoding.EncodeToString(response), "eyJtZXNzYWdlIjoicXVlcnkgdGVzdCJ9")
 }
