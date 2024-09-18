@@ -29,6 +29,8 @@ func TestRegisteredPrecompilesAddresses(t *testing.T) {
 	expectedPrecompiles := []string{
 		// 0x9 address space used for e2e & integration tests
 		"0x9000000000000000000000000000000000000001", // noop
+		"0x9000000000000000000000000000000000000002", // noop
+		"0x9000000000000000000000000000000000000003", // noop
 	}
 
 	assert.Equal(t, expectedPrecompiles, registeredPrecompiles,

@@ -53,6 +53,190 @@ func PrivateKeyToAddresses(privKey cryptotypes.PrivKey) (sdk.AccAddress, common.
 	return sdk.AccAddress(privKey.PubKey().Address()), crypto.PubkeyToAddress(*pubKey)
 }
 
+func TestGetCosmosAddr(t *testing.T) {
+	tApp := app.NewTestApp()
+	ctx := tApp.NewContext(true, tmtypes.Header{Height: 1, ChainID: "kava-test", Time: time.Now().UTC()})
+
+	method := addr.ABI.Methods[addr.GetCosmosAddressMethod]
+
+	targetPrivKey := MockPrivateKey()
+	targetCosmosAddress, targetEvmAddress := PrivateKeyToAddresses(targetPrivKey)
+	targetCosmosAddressNoMapping := sdk.AccAddress(targetEvmAddress.Bytes())
+
+	evm := vm.EVM{
+		StateDB:   statedb.New(ctx, tApp.GetEvmKeeper(), statedb.NewEmptyTxConfig(common.BytesToHash(ctx.HeaderHash().Bytes()))),
+		TxContext: vm.TxContext{Origin: targetEvmAddress},
+	}
+
+	happyPathOutputNoMapping, _ := method.Outputs.Pack(targetCosmosAddressNoMapping.String())
+	happyPathOutput, _ := method.Outputs.Pack(targetCosmosAddress.String())
+
+	type args struct {
+		evm      *vm.EVM
+		caller   common.Address
+		value    *big.Int
+		readOnly bool
+		hookFn   func()
+	}
+	tests := []struct {
+		name       string
+		args       args
+		wantRet    []byte
+		wantErr    bool
+		wantErrMsg string
+		wrongRet   bool
+	}{
+		{
+			name: "happy path - no evm mapping",
+			args: args{
+				evm:    &evm,
+				caller: targetEvmAddress,
+				value:  big.NewInt(0),
+				hookFn: func() {},
+			},
+			wantRet: happyPathOutputNoMapping,
+			wantErr: false,
+		},
+		{
+			name: "happy path - with evm mapping",
+			args: args{
+				evm:    &evm,
+				caller: targetEvmAddress,
+				value:  big.NewInt(0),
+				hookFn: func() {
+					tApp.GetEvmKeeper().SetAddressMapping(ctx, targetCosmosAddress, targetEvmAddress)
+				},
+			},
+			wantRet: happyPathOutput,
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create the precompile and inputs
+			p, err := addr.NewContract(tApp.GetEvmKeeper())
+			require.Nil(t, err)
+			inputs, err := method.Inputs.Pack(tt.args.caller)
+			require.Nil(t, err)
+
+			// call hook before testing
+			tt.args.hookFn()
+
+			// Make the call to associate.
+			ret, _, err := p.Run(tt.args.evm, tt.args.caller, tt.args.caller,
+				append(method.ID, inputs...),
+				suppliedGas,
+				tt.args.readOnly,
+				tt.args.value,
+			)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Run() error = %v, wantErr %v %v", err, tt.wantErr, string(ret))
+				return
+			}
+			if err != nil {
+				require.Equal(t, tt.wantErrMsg, err.Error())
+			} else if tt.wrongRet {
+				// tt.wrongRet is set if we expect a return value that's different from the happy path. This means that the wrong addresses were associated.
+				require.NotEqual(t, tt.wantRet, ret)
+			} else {
+				require.Equal(t, tt.wantRet, ret)
+			}
+		})
+	}
+}
+
+func TestGetEvmAddr(t *testing.T) {
+	tApp := app.NewTestApp()
+	ctx := tApp.NewContext(true, tmtypes.Header{Height: 1, ChainID: "kava-test", Time: time.Now().UTC()})
+
+	method := addr.ABI.Methods[addr.GetEvmAddressMethod]
+
+	targetPrivKey := MockPrivateKey()
+	targetCosmosAddress, targetEvmAddress := PrivateKeyToAddresses(targetPrivKey)
+
+	evm := vm.EVM{
+		StateDB:   statedb.New(ctx, tApp.GetEvmKeeper(), statedb.NewEmptyTxConfig(common.BytesToHash(ctx.HeaderHash().Bytes()))),
+		TxContext: vm.TxContext{Origin: targetEvmAddress},
+	}
+
+	happyPathOutput, _ := method.Outputs.Pack(targetEvmAddress)
+
+	type args struct {
+		evm      *vm.EVM
+		caller   common.Address
+		value    *big.Int
+		readOnly bool
+		hookFn   func()
+	}
+	tests := []struct {
+		name       string
+		args       args
+		wantRet    []byte
+		wantErr    bool
+		wantErrMsg string
+		wrongRet   bool
+	}{
+		{
+			name: "happy path - no evm mapping",
+			args: args{
+				evm:    &evm,
+				caller: targetEvmAddress,
+				value:  big.NewInt(0),
+				hookFn: func() {},
+			},
+			wantErrMsg: fmt.Errorf("cosmos address %s is not associated\n", targetCosmosAddress).Error(),
+			wantErr: true,
+		},
+		{
+			name: "happy path - with evm mapping",
+			args: args{
+				evm:    &evm,
+				caller: targetEvmAddress,
+				value:  big.NewInt(0),
+				hookFn: func() {
+					tApp.GetEvmKeeper().SetAddressMapping(ctx, targetCosmosAddress, targetEvmAddress)
+				},
+			},
+			wantRet: happyPathOutput,
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create the precompile and inputs
+			p, err := addr.NewContract(tApp.GetEvmKeeper())
+			require.Nil(t, err)
+			inputs, err := method.Inputs.Pack(targetCosmosAddress.String())
+			require.Nil(t, err)
+
+			// call hook before testing
+			tt.args.hookFn()
+
+			// Make the call to associate.
+			ret, _, err := p.Run(tt.args.evm, tt.args.caller, tt.args.caller,
+				append(method.ID, inputs...),
+				suppliedGas,
+				tt.args.readOnly,
+				tt.args.value,
+			)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Run() error = %v, wantErr %v %v", err, tt.wantErr, string(ret))
+				return
+			}
+			if err != nil {
+				require.Equal(t, tt.wantErrMsg, err.Error())
+			} else if tt.wrongRet {
+				// tt.wrongRet is set if we expect a return value that's different from the happy path. This means that the wrong addresses were associated.
+				require.NotEqual(t, tt.wantRet, ret)
+			} else {
+				require.Equal(t, tt.wantRet, ret)
+			}
+		})
+	}
+}
+
 func TestAssociatePubKey(t *testing.T) {
 	tApp := app.NewTestApp()
 	ctx := tApp.NewContext(true, tmtypes.Header{Height: 1, ChainID: "kava-test", Time: time.Now().UTC()})
@@ -164,6 +348,11 @@ func TestAssociatePubKey(t *testing.T) {
 				require.NotEqual(t, tt.wantRet, ret)
 			} else {
 				require.Equal(t, tt.wantRet, ret)
+				mappedCosmosAddress := tApp.GetEvmKeeper().GetCosmosAddressMapping(ctx, targetEvmAddress)
+				require.Equal(t, targetCosmosAddress, mappedCosmosAddress)
+				mappedEvmAddress, err := tApp.GetEvmKeeper().GetEvmAddressMapping(ctx, targetCosmosAddress)
+				require.NoError(t, err)
+				require.Equal(t, &targetEvmAddress, mappedEvmAddress)
 			}
 		})
 	}
@@ -320,6 +509,12 @@ func TestAssociate(t *testing.T) {
 				require.NotEqual(t, tt.wantRet, ret)
 			} else {
 				require.Equal(t, tt.wantRet, ret)
+				require.Equal(t, tt.wantRet, ret)
+				mappedCosmosAddress := tApp.GetEvmKeeper().GetCosmosAddressMapping(ctx, targetEvmAddress)
+				require.Equal(t, targetCosmosAddress, mappedCosmosAddress)
+				mappedEvmAddress, err := tApp.GetEvmKeeper().GetEvmAddressMapping(ctx, targetCosmosAddress)
+				require.NoError(t, err)
+				require.Equal(t, targetEvmAddress, mappedEvmAddress)
 			}
 		})
 	}

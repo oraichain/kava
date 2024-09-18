@@ -180,7 +180,7 @@ func (p PrecompileExecutor) getEvmAddr(accessibleState contract.AccessibleState,
 
 	evmAddress, err := p.evmKeeper.GetEvmAddressMapping(ctx, cosmosAddress)
 	if err != nil {
-		rerr = fmt.Errorf("sei address %s is not associated\n", cosmosAddress)
+		rerr = fmt.Errorf("cosmos address %s is not associated\n", cosmosAddress)
 		return
 	}
 
