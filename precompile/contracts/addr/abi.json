@@ -8,7 +8,7 @@
     ],
     "name": "associate",
     "outputs": [
-      { "internalType": "string", "name": "seiAddr", "type": "string" },
+      { "internalType": "string", "name": "cosmosAddr", "type": "string" },
       { "internalType": "address", "name": "evmAddr", "type": "address" }
     ],
     "stateMutability": "nonpayable",
@@ -20,7 +20,7 @@
     ],
     "name": "associatePubKey",
     "outputs": [
-      { "internalType": "string", "name": "seiAddr", "type": "string" },
+      { "internalType": "string", "name": "cosmosAddr", "type": "string" },
       { "internalType": "address", "name": "evmAddr", "type": "address" }
     ],
     "stateMutability": "nonpayable",
