@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/precompile/contract"
 	"github.com/ethereum/go-ethereum/precompile/modules"
 	pcommon "github.com/kava-labs/kava/precompile/common"
+	"github.com/kava-labs/kava/precompile/contracts/addr"
 	"github.com/kava-labs/kava/precompile/contracts/json"
 	"github.com/kava-labs/kava/precompile/contracts/wasmd"
 )
@@ -14,7 +15,8 @@ import (
 var (
 	// WasmdContractAddress the primary noop contract address for testing
 	WasmdContractAddress = common.HexToAddress("0x9000000000000000000000000000000000000001")
-	JsonContractAddress = common.HexToAddress("0x9000000000000000000000000000000000000002")
+	JsonContractAddress  = common.HexToAddress("0x9000000000000000000000000000000000000002")
+	AddrContractAddress  = common.HexToAddress("0x9000000000000000000000000000000000000003")
 )
 
 // init registers stateful precompile contracts with the global precompile registry
@@ -30,8 +32,14 @@ func InitializePrecompiles(wasmdKeeper pcommon.WasmdKeeper, wasmdViewKeeper pcom
 		panic(fmt.Errorf("error creating json helper for address %s: %w", JsonContractAddress, err))
 	}
 
+	addrContract, err := addr.NewContract(evmKeeper)
+	if err != nil {
+		panic(fmt.Errorf("error creating addr helper for solidity contract %s: %w", AddrContractAddress, err))
+	}
+
 	register(WasmdContractAddress, wasmdContract)
 	register(JsonContractAddress, jsonContract)
+	register(AddrContractAddress, addrContract)
 }
 
 // register accepts a 0x address string and a stateful precompile contract constructor, instantiates the

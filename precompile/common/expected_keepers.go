@@ -7,6 +7,12 @@ import (
 
 type EVMKeeper interface {
 	GetCosmosAddressMapping(ctx sdk.Context, evmAddress common.Address) sdk.AccAddress
+	GetEvmAddressMapping(ctx sdk.Context, addr sdk.AccAddress) (*common.Address, error)
+	SetMappingEvmAddressInner(
+		ctx sdk.Context,
+		msgSigner string,
+		msgPubKey string,
+	) error
 }
 
 type WasmdKeeper interface {

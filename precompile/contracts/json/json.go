@@ -7,7 +7,6 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/precompile/contract"
 	pcommon "github.com/kava-labs/kava/precompile/common"
@@ -27,8 +26,6 @@ const (
 	ExtractAsBytesListMethod = "extractAsBytesList"
 	ExtractAsUint256Method   = "extractAsUint256"
 )
-
-const GasCostPerByte = 100 // TODO: parameterize
 
 type PrecompileExecutor struct {
 }
@@ -64,15 +61,10 @@ func NewContract() (contract.StatefulPrecompiledContract, error) {
 	precompile, err := contract.NewStatefulPrecompileContract(functions)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate wasmd precompile: %w", err)
+		return nil, fmt.Errorf("failed to instantiate json precompile: %w", err)
 	}
 
 	return precompile, nil
-}
-
-// RequiredGas returns the required bare minimum gas to execute the precompile.
-func (p PrecompileExecutor) RequiredGas(input []byte, method *abi.Method) uint64 {
-	return uint64(GasCostPerByte * len(input))
 }
 
 func (p PrecompileExecutor) extractAsBytes(accessibleState contract.AccessibleState,

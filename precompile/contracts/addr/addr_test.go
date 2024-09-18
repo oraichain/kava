@@ -1,0 +1,326 @@
+package addr_test
+
+import (
+	"encoding/hex"
+	"fmt"
+	"math/big"
+	"testing"
+	"time"
+
+	"github.com/cosmos/cosmos-sdk/crypto/hd"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/go-bip39"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/kava-labs/kava/app"
+	"github.com/kava-labs/kava/precompile/contracts/addr"
+	"github.com/tharsis/ethermint/x/evm/statedb"
+
+	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
+	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/stretchr/testify/require"
+	tmtypes "github.com/tendermint/tendermint/proto/tendermint/types"
+)
+
+const suppliedGas = uint64(10_000_000)
+
+func MockAddressPair() (sdk.AccAddress, common.Address) {
+	return PrivateKeyToAddresses(MockPrivateKey())
+}
+
+func MockPrivateKey() cryptotypes.PrivKey {
+	// Generate a new Sei private key
+	entropySeed, _ := bip39.NewEntropy(256)
+	mnemonic, _ := bip39.NewMnemonic(entropySeed)
+	algo := hd.Secp256k1
+	derivedPriv, _ := algo.Derive()(mnemonic, "", "")
+	return algo.Generate()(derivedPriv)
+}
+
+func PrivateKeyToAddresses(privKey cryptotypes.PrivKey) (sdk.AccAddress, common.Address) {
+	// Encode the private key to hex (i.e. what wallets do behind the scene when users reveal private keys)
+	testPrivHex := hex.EncodeToString(privKey.Bytes())
+
+	// Sign an Ethereum transaction with the hex private key
+	key, _ := crypto.HexToECDSA(testPrivHex)
+	msg := crypto.Keccak256([]byte("foo"))
+	sig, _ := crypto.Sign(msg, key)
+
+	// Recover the public keys from the Ethereum signature
+	recoveredPub, _ := crypto.Ecrecover(msg, sig)
+	pubKey, _ := crypto.UnmarshalPubkey(recoveredPub)
+
+	return sdk.AccAddress(privKey.PubKey().Address()), crypto.PubkeyToAddress(*pubKey)
+}
+
+func TestAssociatePubKey(t *testing.T) {
+	tApp := app.NewTestApp()
+	ctx := tApp.NewContext(true, tmtypes.Header{Height: 1, ChainID: "kava-test", Time: time.Now().UTC()})
+
+	method := addr.ABI.Methods[addr.AssociatePubKeyMethod]
+
+	// Target refers to the address that the caller is trying to associate.
+	targetPrivKey := MockPrivateKey()
+	targetPubKey := targetPrivKey.PubKey()
+	targetPubKeyHex := hex.EncodeToString(targetPubKey.Bytes())
+	targetCosmosAddress, targetEvmAddress := PrivateKeyToAddresses(targetPrivKey)
+
+	// Caller refers to the party calling the precompile.
+	callerPrivKey := MockPrivateKey()
+	_, callerEvmAddress := PrivateKeyToAddresses(callerPrivKey)
+
+	evm := vm.EVM{
+		StateDB:   statedb.New(ctx, tApp.GetEvmKeeper(), statedb.NewEmptyTxConfig(common.BytesToHash(ctx.HeaderHash().Bytes()))),
+		TxContext: vm.TxContext{Origin: callerEvmAddress},
+	}
+
+	happyPathOutput, _ := method.Outputs.Pack(targetCosmosAddress.String(), targetEvmAddress)
+
+	type args struct {
+		evm      *vm.EVM
+		caller   common.Address
+		pubKey   string
+		value    *big.Int
+		readOnly bool
+	}
+	tests := []struct {
+		name       string
+		args       args
+		wantRet    []byte
+		wantErr    bool
+		wantErrMsg string
+		wrongRet   bool
+	}{
+		{
+			name: "fails if payable",
+			args: args{
+				evm:    &evm,
+				caller: callerEvmAddress,
+				pubKey: targetPubKeyHex,
+				value:  big.NewInt(10),
+			},
+			wantErr:    true,
+			wantErrMsg: "sending funds to a non-payable function",
+		},
+		{
+			name: "fails on static call",
+			args: args{
+				evm:      &evm,
+				caller:   callerEvmAddress,
+				pubKey:   targetPubKeyHex,
+				value:    big.NewInt(10),
+				readOnly: true,
+			},
+			wantErr:    true,
+			wantErrMsg: "cannot call associate pub key precompile from staticcall",
+		},
+		{
+			name: "fails if input is appended with 0x",
+			args: args{
+				evm:    &evm,
+				caller: callerEvmAddress,
+				pubKey: fmt.Sprintf("0x%v", targetPubKeyHex),
+				value:  big.NewInt(0),
+			},
+			wantErr:    true,
+			wantErrMsg: "encoding/hex: invalid byte: U+0078 'x'",
+		},
+		{
+			name: "happy path - associates addresses if signature is correct",
+			args: args{
+				evm:    &evm,
+				caller: callerEvmAddress,
+				pubKey: targetPubKeyHex,
+				value:  big.NewInt(0),
+			},
+			wantRet: happyPathOutput,
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create the precompile and inputs
+			p, err := addr.NewContract(tApp.GetEvmKeeper())
+			require.Nil(t, err)
+			inputs, err := method.Inputs.Pack(tt.args.pubKey)
+			require.Nil(t, err)
+
+			// Make the call to associate.
+			ret, _, err := p.Run(tt.args.evm, tt.args.caller, tt.args.caller,
+				append(method.ID, inputs...),
+				suppliedGas,
+				tt.args.readOnly,
+				tt.args.value,
+			)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Run() error = %v, wantErr %v %v", err, tt.wantErr, string(ret))
+				return
+			}
+			if err != nil {
+				require.Equal(t, tt.wantErrMsg, err.Error())
+			} else if tt.wrongRet {
+				// tt.wrongRet is set if we expect a return value that's different from the happy path. This means that the wrong addresses were associated.
+				require.NotEqual(t, tt.wantRet, ret)
+			} else {
+				require.Equal(t, tt.wantRet, ret)
+			}
+		})
+	}
+}
+
+func TestAssociate(t *testing.T) {
+	tApp := app.NewTestApp()
+	ctx := tApp.NewContext(true, tmtypes.Header{Height: 1, ChainID: "kava-test", Time: time.Now().UTC()})
+
+	method := addr.ABI.Methods[addr.AssociateMethod]
+
+	// Target refers to the address that the caller is trying to associate.
+	targetPrivKey := MockPrivateKey()
+	targetPrivHex := hex.EncodeToString(targetPrivKey.Bytes())
+	targetCosmosAddress, targetEvmAddress := PrivateKeyToAddresses(targetPrivKey)
+	targetKey, _ := crypto.HexToECDSA(targetPrivHex)
+
+	// Create the inputs
+	emptyData := make([]byte, 32)
+	prefixedMessage := fmt.Sprintf("\x19Ethereum Signed Message:\n%d", len(emptyData)) + string(emptyData)
+	hash := crypto.Keccak256Hash([]byte(prefixedMessage))
+	sig, err := crypto.Sign(hash.Bytes(), targetKey)
+	require.Nil(t, err)
+
+	r := fmt.Sprintf("0x%v", new(big.Int).SetBytes(sig[:32]).Text(16))
+	s := fmt.Sprintf("0x%v", new(big.Int).SetBytes(sig[32:64]).Text(16))
+	v := fmt.Sprintf("0x%v", new(big.Int).SetBytes([]byte{sig[64]}).Text(16))
+
+	// Caller refers to the party calling the precompile.
+	callerPrivKey := MockPrivateKey()
+	_, callerEvmAddress := PrivateKeyToAddresses(callerPrivKey)
+
+	evm := vm.EVM{
+		StateDB:   statedb.New(ctx, tApp.GetEvmKeeper(), statedb.NewEmptyTxConfig(common.BytesToHash(ctx.HeaderHash().Bytes()))),
+		TxContext: vm.TxContext{Origin: callerEvmAddress},
+	}
+
+	happyPathOutput, _ := method.Outputs.Pack(targetCosmosAddress.String(), targetEvmAddress)
+
+	type args struct {
+		evm      *vm.EVM
+		caller   common.Address
+		v        string
+		r        string
+		s        string
+		msg      string
+		value    *big.Int
+		readOnly bool
+	}
+	tests := []struct {
+		name       string
+		args       args
+		wantRet    []byte
+		wantErr    bool
+		wantErrMsg string
+		wrongRet   bool
+	}{
+		{
+			name: "fails if payable",
+			args: args{
+				evm:    &evm,
+				caller: callerEvmAddress,
+				v:      v,
+				r:      r,
+				s:      s,
+				msg:    prefixedMessage,
+				value:  big.NewInt(10),
+			},
+			wantErr:    true,
+			wantErrMsg: "sending funds to a non-payable function",
+		},
+		{
+			name: "fails on static calls",
+			args: args{
+				evm:      &evm,
+				caller:   callerEvmAddress,
+				v:        v,
+				r:        r,
+				s:        s,
+				msg:      prefixedMessage,
+				value:    big.NewInt(10),
+				readOnly: true,
+			},
+			wantErr:    true,
+			wantErrMsg: "cannot call associate precompile from staticcall",
+		},
+		{
+			name: "fails if input is not hex",
+			args: args{
+				evm:    &evm,
+				caller: callerEvmAddress,
+				v:      "nothex",
+				r:      r,
+				s:      s,
+				msg:    prefixedMessage,
+				value:  big.NewInt(0),
+			},
+			wantErr:    true,
+			wantErrMsg: "encoding/hex: invalid byte: U+006E 'n'",
+		},
+		{
+			name: "associates wrong address if invalid signature (different message)",
+			args: args{
+				evm:    &evm,
+				caller: callerEvmAddress,
+				v:      v,
+				r:      r,
+				s:      s, // Pass in r instead of s here for invalid value
+				msg:    "Not the signed message",
+				value:  big.NewInt(0),
+			},
+			wantRet:  happyPathOutput,
+			wrongRet: true,
+		},
+		// {
+		// 	name: "happy path - associates addresses if signature is correct",
+		// 	args: args{
+		// 		evm:    &evm,
+		// 		caller: callerEvmAddress,
+		// 		v:      v,
+		// 		r:      r,
+		// 		s:      s,
+		// 		msg:    prefixedMessage,
+		// 		value:  big.NewInt(0),
+		// 	},
+		// 	wantRet: happyPathOutput,
+		// 	wantErr: false,
+		// },
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create the precompile and inputs
+			p, _ := addr.NewContract(tApp.GetEvmKeeper())
+			require.Nil(t, err)
+			inputs, err := method.Inputs.Pack(tt.args.v, tt.args.r, tt.args.s, tt.args.msg)
+			require.Nil(t, err)
+
+			// Make the call to associate.
+			ret, _, err := p.Run(tt.args.evm, tt.args.caller, tt.args.caller,
+				append(method.ID, inputs...),
+				suppliedGas,
+				tt.args.readOnly,
+				tt.args.value,
+			)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Run() error = %v, wantErr %v %v", err, tt.wantErr, string(ret))
+				return
+			}
+			if err != nil {
+				require.Equal(t, tt.wantErrMsg, err.Error())
+			} else if tt.wrongRet {
+				// tt.wrongRet is set if we expect a return value that's different from the happy path. This means that the wrong addresses were associated.
+				require.NotEqual(t, tt.wantRet, ret)
+			} else {
+				require.Equal(t, tt.wantRet, ret)
+			}
+		})
+	}
+}

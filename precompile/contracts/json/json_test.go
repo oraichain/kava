@@ -1,55 +1,20 @@
 package json_test
 
 import (
-	"encoding/hex"
 	"math/big"
 	"testing"
 	"time"
 
-	"github.com/cosmos/cosmos-sdk/crypto/hd"
-	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/go-bip39"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/kava-labs/kava/app"
 	"github.com/kava-labs/kava/precompile/contracts/json"
 	"github.com/kava-labs/kava/precompile/registry"
 	"github.com/stretchr/testify/require"
 	"github.com/tharsis/ethermint/x/evm/statedb"
 
-	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	tmtypes "github.com/tendermint/tendermint/proto/tendermint/types"
 )
-
-func MockAddressPair() (sdk.AccAddress, common.Address) {
-	return PrivateKeyToAddresses(MockPrivateKey())
-}
-
-func MockPrivateKey() cryptotypes.PrivKey {
-	// Generate a new Sei private key
-	entropySeed, _ := bip39.NewEntropy(256)
-	mnemonic, _ := bip39.NewMnemonic(entropySeed)
-	algo := hd.Secp256k1
-	derivedPriv, _ := algo.Derive()(mnemonic, "", "")
-	return algo.Generate()(derivedPriv)
-}
-
-func PrivateKeyToAddresses(privKey cryptotypes.PrivKey) (sdk.AccAddress, common.Address) {
-	// Encode the private key to hex (i.e. what wallets do behind the scene when users reveal private keys)
-	testPrivHex := hex.EncodeToString(privKey.Bytes())
-
-	// Sign an Ethereum transaction with the hex private key
-	key, _ := crypto.HexToECDSA(testPrivHex)
-	msg := crypto.Keccak256([]byte("foo"))
-	sig, _ := crypto.Sign(msg, key)
-
-	// Recover the public keys from the Ethereum signature
-	recoveredPub, _ := crypto.Ecrecover(msg, sig)
-	pubKey, _ := crypto.UnmarshalPubkey(recoveredPub)
-
-	return sdk.AccAddress(privKey.PubKey().Address()), crypto.PubkeyToAddress(*pubKey)
-}
 
 func TestExtractAsBytes(t *testing.T) {
 	tApp := app.NewTestApp()
