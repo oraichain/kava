@@ -1008,7 +1008,7 @@ func NewApp(
 	app.ScopedTransferKeeper = scopedTransferKeeper
 
 	// register wasm keeper
-	registry.InitializePrecompiles(app.contractKeeper, app.wasmKeeper, app.evmKeeper)
+	registry.InitializePrecompiles(app.contractKeeper, app.wasmKeeper, app.evmKeeper, app.bankKeeper, app.accountKeeper)
 
 	return app
 }
