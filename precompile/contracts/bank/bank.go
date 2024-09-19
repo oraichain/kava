@@ -137,21 +137,20 @@ func (p PrecompileExecutor) send(accessibleState contract.AccessibleState,
 		return
 	}
 
-	if err := pcommon.ValidateArgsLength(args, 4); err != nil {
+	if err := pcommon.ValidateArgsLength(args, 3); err != nil {
 		rerr = err
 		return
 	}
 
-	senderEvmAddr := args[0].(common.Address)
-	receiverEvmAddr := args[1].(common.Address)
+	receiverEvmAddr := args[0].(common.Address)
 
-	denom := args[2].(string)
+	denom := args[1].(string)
 	if denom == "" {
 		rerr = errors.New("invalid denom")
 		return
 	}
 
-	amount := args[3].(*big.Int)
+	amount := args[2].(*big.Int)
 	if amount.Cmp(big.NewInt(0)) == 0 {
 		// short circuit
 		ret, rerr = method.Outputs.Pack(true)
@@ -165,7 +164,7 @@ func (p PrecompileExecutor) send(accessibleState contract.AccessibleState,
 	}
 	ctx := ctxer.Ctx()
 
-	senderCosmosAddr := p.evmKeeper.GetCosmosAddressMapping(ctx, senderEvmAddr)
+	senderCosmosAddr := p.evmKeeper.GetCosmosAddressMapping(ctx, caller)
 	receiverCosmosAddr := p.evmKeeper.GetCosmosAddressMapping(ctx, receiverEvmAddr)
 	if err := p.bankKeeper.SendCoins(ctx, senderCosmosAddr, receiverCosmosAddr, sdk.NewCoins(sdk.NewCoin(denom, sdk.NewIntFromBigInt(amount)))); err != nil {
 		rerr = err

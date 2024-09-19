@@ -48,7 +48,6 @@
   },
   {
     "inputs": [
-      { "internalType": "address", "name": "fromAddress", "type": "address" },
       { "internalType": "address", "name": "toAddress", "type": "address" },
       { "internalType": "string", "name": "denom", "type": "string" },
       { "internalType": "uint256", "name": "amount", "type": "uint256" }

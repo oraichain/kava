@@ -79,9 +79,9 @@ func TestSend(t *testing.T) {
 	method := bank.ABI.Methods[bank.SendMethod]
 	suppliedGas := uint64(10_000_000)
 
-	args, err := method.Inputs.Pack(mockEVMAddr, mockReceiverEVMAddr, denom, sentCoins[0].Amount.BigInt())
+	args, err := method.Inputs.Pack(mockReceiverEVMAddr, denom, sentCoins[0].Amount.BigInt())
 	require.Nil(t, err)
-	res, _, err := p.Run(&evm, registry.AddrContractAddress, registry.AddrContractAddress,
+	res, _, err := p.Run(&evm, mockEVMAddr, registry.AddrContractAddress,
 		append(method.ID, args...),
 		suppliedGas,
 		false,
