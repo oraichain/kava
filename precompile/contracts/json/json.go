@@ -3,12 +3,14 @@ package json
 import (
 	_ "embed"
 	gjson "encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/precompile/contract"
+	"github.com/tharsis/ethermint/x/evm/statedb"
 	pcommon "github.com/kava-labs/kava/precompile/common"
 )
 
@@ -114,13 +116,21 @@ func (p PrecompileExecutor) extractAsBytes(accessibleState contract.AccessibleSt
 		rerr = fmt.Errorf("Could not decode key extractAsBytes\n")
 		return
 	}
+
+	ctxer, ok := accessibleState.GetStateDB().(*statedb.StateDB)
+	if !ok {
+		rerr = errors.New("cannot get context from EVM")
+		return
+	}
+	ctx := ctxer.Ctx()
+
 	// in the case of a string value, remove the quotes
 	if len(result) >= 2 && result[0] == '"' && result[len(result)-1] == '"' {
 		result = result[1 : len(result)-1]
 	}
 
 	ret, rerr = method.Outputs.Pack([]byte(result))
-	remainingGas, rerr = contract.DeductGas(suppliedGas, 0)
+	remainingGas, rerr = contract.DeductGas(suppliedGas, ctx.GasMeter().GasConsumed())
 	return
 }
 
@@ -171,6 +181,14 @@ func (p PrecompileExecutor) extractAsBytesList(accessibleState contract.Accessib
 		rerr = fmt.Errorf("input does not contain key %s in extractAsBytesList\n", key)
 		return
 	}
+
+	ctxer, ok := accessibleState.GetStateDB().(*statedb.StateDB)
+	if !ok {
+		rerr = errors.New("cannot get context from EVM")
+		return
+	}
+	ctx := ctxer.Ctx()
+
 	decodedResult := []gjson.RawMessage{}
 	if err := gjson.Unmarshal(result, &decodedResult); err != nil {
 		rerr = err
@@ -183,7 +201,7 @@ func (p PrecompileExecutor) extractAsBytesList(accessibleState contract.Accessib
 	}
 
 	ret, rerr = method.Outputs.Pack(decodedBytes)
-	remainingGas, rerr = contract.DeductGas(suppliedGas, 0)
+	remainingGas, rerr = contract.DeductGas(suppliedGas, ctx.GasMeter().GasConsumed())
 	return
 }
 
@@ -204,6 +222,13 @@ func (p PrecompileExecutor) ExtractAsUint256(accessibleState contract.Accessible
 		}
 	}()
 
+	ctxer, ok := accessibleState.GetStateDB().(*statedb.StateDB)
+	if !ok {
+		rerr = errors.New("cannot get context from EVM")
+		return
+	}
+	ctx := ctxer.Ctx()
+
 	byteArr := make([]byte, 32)
 	uint_, err := p.extractAsUint256(packedInput, value)
 	if err != nil {
@@ -217,7 +242,7 @@ func (p PrecompileExecutor) ExtractAsUint256(accessibleState contract.Accessible
 
 	uint_.FillBytes(byteArr)
 
-	remainingGas, rerr = contract.DeductGas(suppliedGas, 0)
+	remainingGas, rerr = contract.DeductGas(suppliedGas, ctx.GasMeter().GasConsumed())
 
 	return byteArr, remainingGas, nil
 }

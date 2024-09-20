@@ -127,7 +127,7 @@ func (p PrecompileExecutor) getCosmosAddr(accessibleState contract.AccessibleSta
 	cosmosAddress := p.evmKeeper.GetCosmosAddressMapping(ctx, evmAddress)
 
 	ret, rerr = method.Outputs.Pack(cosmosAddress.String())
-	remainingGas, rerr = contract.DeductGas(suppliedGas, 0)
+	remainingGas, rerr = contract.DeductGas(suppliedGas, ctx.GasMeter().GasConsumed())
 	return
 }
 
@@ -185,7 +185,7 @@ func (p PrecompileExecutor) getEvmAddr(accessibleState contract.AccessibleState,
 	}
 
 	ret, rerr = method.Outputs.Pack(evmAddress)
-	remainingGas, rerr = contract.DeductGas(suppliedGas, 0)
+	remainingGas, rerr = contract.DeductGas(suppliedGas, ctx.GasMeter().GasConsumed())
 	return
 }
 
@@ -273,10 +273,14 @@ func (p PrecompileExecutor) associate(accessibleState contract.AccessibleState,
 		return
 	}
 
-	cosmosAddress, evmAddress, err := p.associateAddresses(ctx, pubKeyBytes)
+	cosmosAddress, evmAddress, err := p.associateAddresses(ctx, caller, pubKeyBytes)
+	if err != nil {
+		rerr = err
+		return
+	}
 
 	ret, rerr = method.Outputs.Pack(cosmosAddress.String(), evmAddress)
-	remainingGas, rerr = contract.DeductGas(suppliedGas, 0)
+	remainingGas, rerr = contract.DeductGas(suppliedGas, ctx.GasMeter().GasConsumed())
 	return
 }
 
@@ -293,6 +297,7 @@ func (p PrecompileExecutor) associatePublicKey(accessibleState contract.Accessib
 			ret = nil
 			remainingGas = 0
 			rerr = fmt.Errorf("%s\n", err)
+			fmt.Println("error associate pubkey: ", rerr)
 			return
 		}
 	}()
@@ -335,18 +340,27 @@ func (p PrecompileExecutor) associatePublicKey(accessibleState contract.Accessib
 	}
 	ctx := ctxer.Ctx()
 
-	cosmosAddress, evmAddress, err := p.associateAddresses(ctx, pubKeyBytes)
+	cosmosAddress, evmAddress, err := p.associateAddresses(ctx, caller, pubKeyBytes)
+	if err != nil {
+		rerr = err
+		return
+	}
 
 	ret, rerr = method.Outputs.Pack(cosmosAddress.String(), evmAddress)
-	remainingGas, rerr = contract.DeductGas(suppliedGas, 0)
+	remainingGas, rerr = contract.DeductGas(suppliedGas, ctx.GasMeter().GasConsumed())
 	return
 }
 
-func (p PrecompileExecutor) associateAddresses(ctx sdk.Context, pubkey []byte) (sdk.AccAddress, *common.Address, error) {
+func (p PrecompileExecutor) associateAddresses(ctx sdk.Context, caller common.Address, pubkey []byte) (sdk.AccAddress, *common.Address, error) {
 	evmAddress, err := evmtypes.PubkeyBytesToEVMAddress(pubkey)
 	if err != nil {
 		return nil, nil, err
 	}
+
+	if evmAddress.Hex() != caller.Hex() {
+		return nil, nil, fmt.Errorf("Caller address %s does not match with EVM address %s computed from the public key %s\n", caller.Hex(), evmAddress.Hex(), base64.StdEncoding.EncodeToString(pubkey))
+	}
+
 	cosmosAddress, err := evmtypes.PubkeyBytesToCosmosAddress(pubkey)
 	if err != nil {
 		return nil, nil, err

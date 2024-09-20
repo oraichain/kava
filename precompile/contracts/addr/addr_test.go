@@ -1,6 +1,7 @@
 package addr_test
 
 import (
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"math/big"
@@ -186,7 +187,7 @@ func TestGetEvmAddr(t *testing.T) {
 				hookFn: func() {},
 			},
 			wantErrMsg: fmt.Errorf("cosmos address %s is not associated\n", targetCosmosAddress).Error(),
-			wantErr: true,
+			wantErr:    true,
 		},
 		{
 			name: "happy path - with evm mapping",
@@ -310,10 +311,21 @@ func TestAssociatePubKey(t *testing.T) {
 			wantErrMsg: "encoding/hex: invalid byte: U+0078 'x'",
 		},
 		{
-			name: "happy path - associates addresses if signature is correct",
+			name: "fails if caller address does not match with public key",
 			args: args{
 				evm:    &evm,
 				caller: callerEvmAddress,
+				pubKey: targetPubKeyHex,
+				value:  big.NewInt(0),
+			},
+			wantErrMsg: fmt.Errorf("Caller address %s does not match with EVM address %s computed from the public key %s\n", callerEvmAddress.Hex(), targetEvmAddress.Hex(), base64.StdEncoding.EncodeToString(targetPubKey.Bytes())).Error(),
+			wantErr:    true,
+		},
+		{
+			name: "happy path - associates addresses if signature is correct",
+			args: args{
+				evm:    &evm,
+				caller: targetEvmAddress,
 				pubKey: targetPubKeyHex,
 				value:  big.NewInt(0),
 			},
@@ -461,26 +473,26 @@ func TestAssociate(t *testing.T) {
 				v:      v,
 				r:      r,
 				s:      s, // Pass in r instead of s here for invalid value
-				msg:    "Not the signed message",
+				msg:    prefixedMessage,
 				value:  big.NewInt(0),
 			},
-			wantRet:  happyPathOutput,
-			wrongRet: true,
+			wantErrMsg: fmt.Errorf("Caller address %s does not match with EVM address %s computed from the public key %s\n", callerEvmAddress.Hex(), targetEvmAddress.Hex(), base64.StdEncoding.EncodeToString(targetPrivKey.PubKey().Bytes())).Error(),
+			wantErr: true,
 		},
-		// {
-		// 	name: "happy path - associates addresses if signature is correct",
-		// 	args: args{
-		// 		evm:    &evm,
-		// 		caller: callerEvmAddress,
-		// 		v:      v,
-		// 		r:      r,
-		// 		s:      s,
-		// 		msg:    prefixedMessage,
-		// 		value:  big.NewInt(0),
-		// 	},
-		// 	wantRet: happyPathOutput,
-		// 	wantErr: false,
-		// },
+		{
+			name: "happy path - associates addresses if signature is correct",
+			args: args{
+				evm:    &evm,
+				caller: targetEvmAddress,
+				v:      v,
+				r:      r,
+				s:      s,
+				msg:    prefixedMessage,
+				value:  big.NewInt(0),
+			},
+			wantRet: happyPathOutput,
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -514,7 +526,7 @@ func TestAssociate(t *testing.T) {
 				require.Equal(t, targetCosmosAddress, mappedCosmosAddress)
 				mappedEvmAddress, err := tApp.GetEvmKeeper().GetEvmAddressMapping(ctx, targetCosmosAddress)
 				require.NoError(t, err)
-				require.Equal(t, targetEvmAddress, mappedEvmAddress)
+				require.Equal(t, &targetEvmAddress, mappedEvmAddress)
 			}
 		})
 	}

@@ -112,6 +112,8 @@ func (p PrecompileExecutor) send(accessibleState contract.AccessibleState,
 	readOnly bool,
 	value *big.Int) (ret []byte, remainingGas uint64, rerr error) {
 
+	fmt.Println("in here send")
+
 	defer func() {
 		if err := recover(); err != nil {
 			ret = nil
@@ -172,7 +174,7 @@ func (p PrecompileExecutor) send(accessibleState contract.AccessibleState,
 	}
 
 	ret, rerr = method.Outputs.Pack(true)
-	remainingGas, rerr = contract.DeductGas(suppliedGas, 0)
+	remainingGas, rerr = contract.DeductGas(suppliedGas, ctx.GasMeter().GasConsumed())
 	return
 }
 
@@ -229,7 +231,7 @@ func (p PrecompileExecutor) balance(accessibleState contract.AccessibleState,
 	balance := p.bankKeeper.GetBalance(ctx, cosmosAddr, denom)
 
 	ret, rerr = method.Outputs.Pack(balance.Amount.BigInt())
-	remainingGas, rerr = contract.DeductGas(suppliedGas, 0)
+	remainingGas, rerr = contract.DeductGas(suppliedGas, ctx.GasMeter().GasConsumed())
 	return
 }
 
@@ -289,7 +291,7 @@ func (p PrecompileExecutor) allBalances(accessibleState contract.AccessibleState
 	}
 
 	ret, rerr = method.Outputs.Pack(coinBalances)
-	remainingGas, rerr = contract.DeductGas(suppliedGas, 0)
+	remainingGas, rerr = contract.DeductGas(suppliedGas, ctx.GasMeter().GasConsumed())
 	return
 }
 
@@ -311,6 +313,13 @@ func (p PrecompileExecutor) name(accessibleState contract.AccessibleState,
 	}()
 	method := ABI.Methods[NameMethod]
 
+	ctxer, ok := accessibleState.GetStateDB().(*statedb.StateDB)
+	if !ok {
+		rerr = errors.New("cannot get context from EVM")
+		return
+	}
+	ctx := ctxer.Ctx()
+
 	metadata, err := p.getMetadata(accessibleState, method, packedInput, value)
 	if err != nil {
 		rerr = err
@@ -318,7 +327,7 @@ func (p PrecompileExecutor) name(accessibleState contract.AccessibleState,
 	}
 
 	ret, rerr = method.Outputs.Pack(metadata.Name)
-	remainingGas, rerr = contract.DeductGas(suppliedGas, 0)
+	remainingGas, rerr = contract.DeductGas(suppliedGas, ctx.GasMeter().GasConsumed())
 	return
 }
 
@@ -340,6 +349,13 @@ func (p PrecompileExecutor) symbol(accessibleState contract.AccessibleState,
 	}()
 	method := ABI.Methods[SymbolMethod]
 
+	ctxer, ok := accessibleState.GetStateDB().(*statedb.StateDB)
+	if !ok {
+		rerr = errors.New("cannot get context from EVM")
+		return
+	}
+	ctx := ctxer.Ctx()
+
 	metadata, err := p.getMetadata(accessibleState, method, packedInput, value)
 	if err != nil {
 		rerr = err
@@ -347,7 +363,7 @@ func (p PrecompileExecutor) symbol(accessibleState contract.AccessibleState,
 	}
 
 	ret, rerr = method.Outputs.Pack(metadata.Symbol)
-	remainingGas, rerr = contract.DeductGas(suppliedGas, 0)
+	remainingGas, rerr = contract.DeductGas(suppliedGas, ctx.GasMeter().GasConsumed())
 	return
 }
 
@@ -418,7 +434,7 @@ func (p PrecompileExecutor) supply(accessibleState contract.AccessibleState,
 	denom := args[0].(string)
 	coin := p.bankKeeper.GetSupply(ctx, denom)
 	ret, rerr = method.Outputs.Pack(coin.Amount.BigInt())
-	remainingGas, rerr = contract.DeductGas(suppliedGas, 0)
+	remainingGas, rerr = contract.DeductGas(suppliedGas, ctx.GasMeter().GasConsumed())
 	return
 }
 
