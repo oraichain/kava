@@ -1,6 +1,7 @@
 package wasmd_test
 
 import (
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"os"
@@ -94,7 +95,7 @@ func TestContractConstructor(t *testing.T) {
 	assert.NotNil(t, precompile, "expected precompile contract to be defined")
 }
 
-func TestExecute(t *testing.T) {
+func TestExecuteAndQuery(t *testing.T) {
 
 	tApp := app.NewTestApp()
 	ctx := tApp.NewContext(true, tmtypes.Header{Height: 1, ChainID: "kava-test", Time: time.Now().UTC()})
@@ -135,6 +136,7 @@ func TestExecute(t *testing.T) {
 	rets, _ := instantiateMethod.Outputs.Unpack(res)
 	cosmwasmAddr := rets[0].(string)
 
+	// test execute
 	executeMethod := wasmd.ABI.Methods["execute"]
 	funds := sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(10)))
 	err = tApp.GetBankKeeper().IsSendEnabledCoins(ctx, funds...)
@@ -158,4 +160,21 @@ func TestExecute(t *testing.T) {
 	// check balance after sent funds. Should drop
 	balanceAfterExecute := tApp.GetBankKeeper().GetBalance(ctx, mockAddr, "ukava")
 	require.Equal(t, balanceAfterExecute, amts[0].Sub(funds[0]))
+
+	// test query
+	queryMethod := wasmd.ABI.Methods["query"]
+
+	args, err = queryMethod.Inputs.Pack(cosmwasmAddr, []byte("{\"info\":{}}"))
+	require.Nil(t, err)
+
+	res, suppliedGas, err = p.Contract.Run(&evm, mockEVMAddr, registry.WasmdContractAddress,
+		append(queryMethod.ID, args...),
+		suppliedGas,
+		false,
+		nil,
+	)
+	require.Nil(t, err)
+	rets, _ = queryMethod.Outputs.Unpack(res)
+	response = rets[0].([]byte)
+	require.Equal(t, base64.StdEncoding.EncodeToString(response), "eyJtZXNzYWdlIjoicXVlcnkgdGVzdCJ9")
 }

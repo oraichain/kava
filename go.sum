@@ -875,8 +875,8 @@ github.com/openzipkin/zipkin-go v0.2.1/go.mod h1:NaW6tEwdmWMaCDZzg8sh+IBNOxHMPnh
 github.com/openzipkin/zipkin-go v0.2.2/go.mod h1:NaW6tEwdmWMaCDZzg8sh+IBNOxHMPnhQw8ySjnjRyN4=
 github.com/oraichain/cosmos-sdk-kava v0.45.17-0.20240709184359-75c70fd95c18 h1:gBdGuIQzf+pgs0KnYXjv/Z19iW5+j2qSd1YbAOtXJQw=
 github.com/oraichain/cosmos-sdk-kava v0.45.17-0.20240709184359-75c70fd95c18/go.mod h1:wv6KavyzQpqK07HBPi5AFKpjiq53w2vLVsxfRBFRoTM=
-github.com/oraichain/ethermint v0.14.1-0.20240911110219-d0e5ac8cacd1 h1:0Vo3NtpNoRFnjN2u8oSaodcO4N6A/4dI6rVZwg8wb1s=
-github.com/oraichain/ethermint v0.14.1-0.20240911110219-d0e5ac8cacd1/go.mod h1:cTuxZmV5H31kxB1lIYTSSTX4zIxioQQvVuU6yZR/ZZs=
+github.com/oraichain/ethermint v0.14.1-0.20240918072557-f5263be1acb3 h1:21lLXI+p0tpdKrijfK4HEox/uk+UjL42AoHicpb8GDM=
+github.com/oraichain/ethermint v0.14.1-0.20240918072557-f5263be1acb3/go.mod h1:cTuxZmV5H31kxB1lIYTSSTX4zIxioQQvVuU6yZR/ZZs=
 github.com/oraichain/wasmd v0.30.2-0.20240729102409-91ec1f5fdc6c h1:M9XoVJ0EgBPBfuNUMxXGpa5AitznA27m59J0j651opk=
 github.com/oraichain/wasmd v0.30.2-0.20240729102409-91ec1f5fdc6c/go.mod h1:DUWz5+p7h3BbDxXAt7IBovagwt5NRPCGVuQkweIixzM=
 github.com/ory/dockertest v3.3.5+incompatible h1:iLLK6SQwIhcbrG783Dghaaa3WPzGc+4Emza6EbVUUGA=

@@ -17,7 +17,7 @@ import (
 //     expected length, not missing 0's, etc.
 func TestRegisteredPrecompilesAddresses(t *testing.T) {
 
-	registry.InitializePrecompiles(nil, nil, nil)
+	registry.InitializePrecompiles(nil, nil, nil, nil, nil)
 
 	// build list of 0x addresses that are registered
 	registeredModules := modules.RegisteredModules()
@@ -29,6 +29,9 @@ func TestRegisteredPrecompilesAddresses(t *testing.T) {
 	expectedPrecompiles := []string{
 		// 0x9 address space used for e2e & integration tests
 		"0x9000000000000000000000000000000000000001", // noop
+		"0x9000000000000000000000000000000000000002", // noop
+		"0x9000000000000000000000000000000000000003", // noop
+		"0x9000000000000000000000000000000000000004", // noop
 	}
 
 	assert.Equal(t, expectedPrecompiles, registeredPrecompiles,
