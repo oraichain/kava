@@ -255,22 +255,22 @@ func NewContract(wasmdKeeper pcommon.WasmdKeeper, wasmdViewKeeper pcommon.WasmdV
 		evmKeeper:       evmKeeper,
 	}
 
-	var functions []*contract.StatefulPrecompileFunction
+	functions := []*contract.StatefulPrecompileFunction{
+		contract.NewStatefulPrecompileFunction(
+			ABI.Methods["instantiate"].ID,
+			executor.instantiateCosmWasm,
+		),
 
-	functions = append(functions, contract.NewStatefulPrecompileFunction(
-		ABI.Methods["instantiate"].ID,
-		executor.instantiateCosmWasm,
-	))
+		contract.NewStatefulPrecompileFunction(
+			ABI.Methods["execute"].ID,
+			executor.executeCosmWasm,
+		),
 
-	functions = append(functions, contract.NewStatefulPrecompileFunction(
-		ABI.Methods["execute"].ID,
-		executor.executeCosmWasm,
-	))
-
-	functions = append(functions, contract.NewStatefulPrecompileFunction(
-		ABI.Methods["query"].ID,
-		executor.queryCosmWasm,
-	))
+		contract.NewStatefulPrecompileFunction(
+			ABI.Methods["query"].ID,
+			executor.queryCosmWasm,
+		),
+	}
 
 	// Construct the contract with functions.
 	precompile, err := contract.NewStatefulPrecompileContract(functions)

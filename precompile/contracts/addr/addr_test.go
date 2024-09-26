@@ -186,7 +186,7 @@ func TestGetEvmAddr(t *testing.T) {
 				value:  big.NewInt(0),
 				hookFn: func() {},
 			},
-			wantErrMsg: fmt.Errorf("cosmos address %s is not associated\n", targetCosmosAddress).Error(),
+			wantErrMsg: fmt.Errorf("cosmos address %s is not associated", targetCosmosAddress).Error(),
 			wantErr:    true,
 		},
 		{
@@ -318,7 +318,7 @@ func TestAssociatePubKey(t *testing.T) {
 				pubKey: targetPubKeyHex,
 				value:  big.NewInt(0),
 			},
-			wantErrMsg: fmt.Errorf("Caller address %s does not match with EVM address %s computed from the public key %s\n", callerEvmAddress.Hex(), targetEvmAddress.Hex(), base64.StdEncoding.EncodeToString(targetPubKey.Bytes())).Error(),
+			wantErrMsg: fmt.Errorf("caller address %s does not match with EVM address %s computed from the public key %s", callerEvmAddress.Hex(), targetEvmAddress.Hex(), base64.StdEncoding.EncodeToString(targetPubKey.Bytes())).Error(),
 			wantErr:    true,
 		},
 		{
@@ -476,8 +476,8 @@ func TestAssociate(t *testing.T) {
 				msg:    prefixedMessage,
 				value:  big.NewInt(0),
 			},
-			wantErrMsg: fmt.Errorf("Caller address %s does not match with EVM address %s computed from the public key %s\n", callerEvmAddress.Hex(), targetEvmAddress.Hex(), base64.StdEncoding.EncodeToString(targetPrivKey.PubKey().Bytes())).Error(),
-			wantErr: true,
+			wantErrMsg: fmt.Errorf("caller address %s does not match with EVM address %s computed from the public key %s", callerEvmAddress.Hex(), targetEvmAddress.Hex(), base64.StdEncoding.EncodeToString(targetPrivKey.PubKey().Bytes())).Error(),
+			wantErr:    true,
 		},
 		{
 			name: "happy path - associates addresses if signature is correct",

@@ -57,42 +57,30 @@ func NewContract(evmKeeper pcommon.EVMKeeper, bankKeeper pcommon.BankKeeper, acc
 		bankKeeper: bankKeeper,
 	}
 
-	var functions []*contract.StatefulPrecompileFunction
-
-	functions = append(functions, contract.NewStatefulPrecompileFunction(
-		ABI.Methods[SendMethod].ID,
-		executor.send,
-	))
-
-	functions = append(functions, contract.NewStatefulPrecompileFunction(
-		ABI.Methods[BalanceMethod].ID,
-		executor.balance,
-	))
-
-	functions = append(functions, contract.NewStatefulPrecompileFunction(
-		ABI.Methods[AllBalancesMethod].ID,
-		executor.allBalances,
-	))
-
-	functions = append(functions, contract.NewStatefulPrecompileFunction(
-		ABI.Methods[NameMethod].ID,
-		executor.name,
-	))
-
-	functions = append(functions, contract.NewStatefulPrecompileFunction(
-		ABI.Methods[SymbolMethod].ID,
-		executor.symbol,
-	))
-
-	functions = append(functions, contract.NewStatefulPrecompileFunction(
-		ABI.Methods[DecimalsMethod].ID,
-		executor.decimals,
-	))
-
-	functions = append(functions, contract.NewStatefulPrecompileFunction(
-		ABI.Methods[SupplyMethod].ID,
-		executor.supply,
-	))
+	functions := []*contract.StatefulPrecompileFunction{
+		contract.NewStatefulPrecompileFunction(
+			ABI.Methods[SendMethod].ID,
+			executor.send,
+		), contract.NewStatefulPrecompileFunction(
+			ABI.Methods[BalanceMethod].ID,
+			executor.balance,
+		), contract.NewStatefulPrecompileFunction(
+			ABI.Methods[AllBalancesMethod].ID,
+			executor.allBalances,
+		), contract.NewStatefulPrecompileFunction(
+			ABI.Methods[NameMethod].ID,
+			executor.name,
+		), contract.NewStatefulPrecompileFunction(
+			ABI.Methods[SymbolMethod].ID,
+			executor.symbol,
+		), contract.NewStatefulPrecompileFunction(
+			ABI.Methods[DecimalsMethod].ID,
+			executor.decimals,
+		), contract.NewStatefulPrecompileFunction(
+			ABI.Methods[SupplyMethod].ID,
+			executor.supply,
+		),
+	}
 
 	// Construct the contract with functions.
 	precompile, err := contract.NewStatefulPrecompileContract(functions)
@@ -190,7 +178,7 @@ func (p PrecompileExecutor) balance(accessibleState contract.AccessibleState,
 		if err := recover(); err != nil {
 			ret = nil
 			remainingGas = 0
-			rerr = fmt.Errorf("%s\n", err)
+			rerr = fmt.Errorf("%s", err)
 			return
 		}
 	}()
@@ -247,7 +235,7 @@ func (p PrecompileExecutor) allBalances(accessibleState contract.AccessibleState
 		if err := recover(); err != nil {
 			ret = nil
 			remainingGas = 0
-			rerr = fmt.Errorf("%s\n", err)
+			rerr = fmt.Errorf("%s", err)
 			return
 		}
 	}()
@@ -307,7 +295,7 @@ func (p PrecompileExecutor) name(accessibleState contract.AccessibleState,
 		if err := recover(); err != nil {
 			ret = nil
 			remainingGas = 0
-			rerr = fmt.Errorf("%s\n", err)
+			rerr = fmt.Errorf("%s", err)
 			return
 		}
 	}()
@@ -343,7 +331,7 @@ func (p PrecompileExecutor) symbol(accessibleState contract.AccessibleState,
 		if err := recover(); err != nil {
 			ret = nil
 			remainingGas = 0
-			rerr = fmt.Errorf("%s\n", err)
+			rerr = fmt.Errorf("%s", err)
 			return
 		}
 	}()
@@ -379,7 +367,7 @@ func (p PrecompileExecutor) decimals(accessibleState contract.AccessibleState,
 		if err := recover(); err != nil {
 			ret = nil
 			remainingGas = 0
-			rerr = fmt.Errorf("%s\n", err)
+			rerr = fmt.Errorf("%s", err)
 			return
 		}
 	}()
@@ -402,7 +390,7 @@ func (p PrecompileExecutor) supply(accessibleState contract.AccessibleState,
 		if err := recover(); err != nil {
 			ret = nil
 			remainingGas = 0
-			rerr = fmt.Errorf("%s\n", err)
+			rerr = fmt.Errorf("%s", err)
 			return
 		}
 	}()
@@ -465,7 +453,7 @@ func (p PrecompileExecutor) getMetadata(accessibleState contract.AccessibleState
 	denom := args[0].(string)
 	metadata, found := p.bankKeeper.GetDenomMetaData(ctx, denom)
 	if !found {
-		return nil, fmt.Errorf("Could not find the metadata of denom %s\n", denom)
+		return nil, fmt.Errorf("Could not find the metadata of denom %s", denom)
 	}
 	return &metadata, nil
 }

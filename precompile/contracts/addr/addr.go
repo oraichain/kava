@@ -50,27 +50,24 @@ func NewContract(evmKeeper pcommon.EVMKeeper) (contract.StatefulPrecompiledContr
 
 	executor := &PrecompileExecutor{evmKeeper: evmKeeper}
 
-	var functions []*contract.StatefulPrecompileFunction
-
-	functions = append(functions, contract.NewStatefulPrecompileFunction(
-		ABI.Methods[GetCosmosAddressMethod].ID,
-		executor.getCosmosAddr,
-	))
-
-	functions = append(functions, contract.NewStatefulPrecompileFunction(
-		ABI.Methods[GetEvmAddressMethod].ID,
-		executor.getEvmAddr,
-	))
-
-	functions = append(functions, contract.NewStatefulPrecompileFunction(
-		ABI.Methods[AssociateMethod].ID,
-		executor.associate,
-	))
-
-	functions = append(functions, contract.NewStatefulPrecompileFunction(
-		ABI.Methods[AssociatePubKeyMethod].ID,
-		executor.associatePublicKey,
-	))
+	functions := []*contract.StatefulPrecompileFunction{
+		contract.NewStatefulPrecompileFunction(
+			ABI.Methods[GetCosmosAddressMethod].ID,
+			executor.getCosmosAddr,
+		),
+		contract.NewStatefulPrecompileFunction(
+			ABI.Methods[GetEvmAddressMethod].ID,
+			executor.getEvmAddr,
+		),
+		contract.NewStatefulPrecompileFunction(
+			ABI.Methods[AssociateMethod].ID,
+			executor.associate,
+		),
+		contract.NewStatefulPrecompileFunction(
+			ABI.Methods[AssociatePubKeyMethod].ID,
+			executor.associatePublicKey,
+		),
+	}
 
 	// Construct the contract with functions.
 	precompile, err := contract.NewStatefulPrecompileContract(functions)
@@ -143,7 +140,7 @@ func (p PrecompileExecutor) getEvmAddr(accessibleState contract.AccessibleState,
 		if err := recover(); err != nil {
 			ret = nil
 			remainingGas = 0
-			rerr = fmt.Errorf("%s\n", err)
+			rerr = fmt.Errorf("%s", err)
 			return
 		}
 	}()
@@ -180,7 +177,7 @@ func (p PrecompileExecutor) getEvmAddr(accessibleState contract.AccessibleState,
 
 	evmAddress, err := p.evmKeeper.GetEvmAddressMapping(ctx, cosmosAddress)
 	if err != nil {
-		rerr = fmt.Errorf("cosmos address %s is not associated\n", cosmosAddress)
+		rerr = fmt.Errorf("cosmos address %s is not associated", cosmosAddress)
 		return
 	}
 
@@ -201,7 +198,7 @@ func (p PrecompileExecutor) associate(accessibleState contract.AccessibleState,
 		if err := recover(); err != nil {
 			ret = nil
 			remainingGas = 0
-			rerr = fmt.Errorf("%s\n", err)
+			rerr = fmt.Errorf("%s", err)
 			return
 		}
 	}()
@@ -296,7 +293,7 @@ func (p PrecompileExecutor) associatePublicKey(accessibleState contract.Accessib
 		if err := recover(); err != nil {
 			ret = nil
 			remainingGas = 0
-			rerr = fmt.Errorf("%s\n", err)
+			rerr = fmt.Errorf("%s", err)
 			fmt.Println("error associate pubkey: ", rerr)
 			return
 		}
@@ -358,7 +355,7 @@ func (p PrecompileExecutor) associateAddresses(ctx sdk.Context, caller common.Ad
 	}
 
 	if evmAddress.Hex() != caller.Hex() {
-		return nil, nil, fmt.Errorf("Caller address %s does not match with EVM address %s computed from the public key %s\n", caller.Hex(), evmAddress.Hex(), base64.StdEncoding.EncodeToString(pubkey))
+		return nil, nil, fmt.Errorf("caller address %s does not match with EVM address %s computed from the public key %s", caller.Hex(), evmAddress.Hex(), base64.StdEncoding.EncodeToString(pubkey))
 	}
 
 	cosmosAddress, err := evmtypes.PubkeyBytesToCosmosAddress(pubkey)
